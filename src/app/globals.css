@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #050505;
+  --text: #ffffff;
+  --accent: #FF5722;
+  --yellow: #F3FF33;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-text: var(--text);
+  --color-accent: var(--accent);
+  --color-yellow-ascend: var(--yellow);
+  --font-anton: var(--font-anton);
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+.ascend-font,
+.font-display {
+  font-family: var(--font-anton), impact, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.text-accent {
+  color: var(--accent);
+}
+
+.bg-accent {
+  background-color: var(--accent);
+}
+
+.border-accent {
+  border-color: var(--accent);
+}
+
+.bg-yellow-ascend {
+  background-color: var(--yellow);
+  color: #000000;
+}
+
+.text-yellow-ascend {
+  color: var(--yellow);
+}
+
+/* Brutalist ticket borders & utility */
+.ticket-dashed {
+  border-style: dashed;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f0f0f;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Regras de Impressão do Bilhete / Ticket Pass */
+@media print {
+  @page {
+    margin: 1cm;
+    size: auto;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only-ticket {
+    display: block !important;
+    margin: 0 auto !important;
+    max-width: 450px !important;
+    box-shadow: none !important;
+    border: 3px solid black !important;
+  }
+}
