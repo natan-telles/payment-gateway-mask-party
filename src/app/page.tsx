@@ -149,7 +149,14 @@ export default function Home() {
             <span>•</span>
             <span>Deployed on Vercel</span>
             <span>•</span>
-            <span>Anti-Fraud Engine</span>
+            <a
+              href="/admin"
+              className="text-zinc-400 hover:text-[#FF5722] flex items-center gap-1 transition-colors"
+              title="Acesso Administrativo"
+            >
+              <Lock className="w-3 h-3 text-[#FF5722]" />
+              <span>Painel Admin</span>
+            </a>
           </div>
         </div>
       </footer>
