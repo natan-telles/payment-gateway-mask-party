@@ -1,177 +1,263 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Navbar } from '@/components/Navbar';
-import { QueueForm } from '@/components/QueueForm';
 import { TicketBadge } from '@/components/TicketBadge';
 import { CheckStatusModal } from '@/components/CheckStatusModal';
-import { CampaignQrModal } from '@/components/CampaignQrModal';
-import { EventBranding } from '@/components/EventBranding';
-import { FaqSection } from '@/components/FaqSection';
+import { JoinQueueModal } from '@/components/JoinQueueModal';
+import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { QueueResponse } from '@/types/database';
-import { ShieldCheck, Zap, Bell, QrCode, ArrowDown, Lock, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lock, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function Home() {
   const [ticketData, setTicketData] = useState<NonNullable<QueueResponse['data']> | null>(null);
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
-  const [isCampaignQrOpen, setIsCampaignQrOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'info' | 'regras' | 'faq' | null>(null);
+
+  const toggleTab = (tab: 'info' | 'regras' | 'faq') => {
+    setActiveTab(activeTab === tab ? null : tab);
+  };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white selection:bg-[#FF5722] selection:text-black flex flex-col relative overflow-x-hidden">
-      {/* Background shape texture overlay (idêntico ao Caravana Ascend) */}
-      <div 
-        className="fixed inset-0 pointer-events-none z-0 opacity-[0.03] bg-no-repeat bg-cover bg-center"
-        style={{ backgroundImage: "url('/img/background shape.png')" }}
-      />
+    <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] flex flex-col justify-between selection:bg-[#8A3CFF] selection:text-white relative">
+      <Navbar onOpenCheckStatus={() => setIsCheckModalOpen(true)} />
 
-      <Navbar 
-        onOpenCheckStatus={() => setIsCheckModalOpen(true)} 
-        onOpenCampaignQr={() => setIsCampaignQrOpen(true)}
-      />
-
-      <main className="flex-1 z-10 px-4 py-8 md:py-16 max-w-6xl mx-auto w-full">
-        {/* HERO SECTION */}
-        <section className="text-center mb-12 md:mb-16">
-          <div className="inline-flex items-center gap-2 bg-zinc-900 border border-zinc-700 px-3 py-1 mb-6 text-[10px] uppercase font-mono tracking-widest text-[#FF5722]">
-            <span className="w-2 h-2 rounded-full bg-[#FF5722] animate-ping" />
-            <span>CAMPANHA: THE WAITING QUEUE // 1º LOTE</span>
-          </div>
-
-          <h1 className="ascend-font text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tighter uppercase leading-[0.88] text-white">
-            MASK <span className="text-[#FF5722]">PARTY</span>
-          </h1>
-
-          <p className="mt-4 text-xs sm:text-sm md:text-base font-mono uppercase tracking-widest text-zinc-400 max-w-2xl mx-auto">
-            Fila de espera com carimbo imutável. Os primeiros cadastrados recebem o link de compra com prioridade absoluta.
-          </p>
-
-          {/* Destaques Rápidos */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4 max-w-3xl mx-auto mt-8 font-mono text-left">
-            <div className="p-3 bg-zinc-950 border border-zinc-800">
-              <span className="text-[10px] text-zinc-500 uppercase block">1º LOTE</span>
-              <strong className="text-sm md:text-base text-yellow-ascend uppercase font-black">17/10/2026</strong>
+      {/* CONTEÚDO PRINCIPAL (CLEAN & SEM ARRASTO NO MOBILE) */}
+      <main className="flex-1 max-w-5xl mx-auto px-4 py-6 md:py-12 w-full flex flex-col justify-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          
+          {/* COLUNA ESQUERDA: BRANDING, HEADLINE & VIBE DO BAILE */}
+          <div className="lg:col-span-6 flex flex-col justify-center animate-stack-1">
+            {/* Tagline de topo */}
+            <div className="flex items-center gap-2 mb-2 font-data text-[10px] text-[#8A3CFF] uppercase tracking-widest">
+              <span>EDICÃO ANUAL</span>
+              <span className="text-[#5B5B66]">·</span>
+              <span>SÁBADO 31 DE OUTUBRO</span>
             </div>
-            <div className="p-3 bg-zinc-950 border border-zinc-800">
-              <span className="text-[10px] text-zinc-500 uppercase block">PAGAMENTO</span>
-              <strong className="text-sm md:text-base text-white uppercase font-black">PIX AUTOMÁTICO</strong>
-            </div>
-            <div className="p-3 bg-zinc-950 border border-zinc-800">
-              <span className="text-[10px] text-zinc-500 uppercase block">NOTIFICAÇÃO</span>
-              <strong className="text-sm md:text-base text-[#FF5722] uppercase font-black">WHATSAPP / EMAIL</strong>
-            </div>
-            <div className="p-3 bg-zinc-950 border border-zinc-800">
-              <span className="text-[10px] text-zinc-500 uppercase block">ENTREGA</span>
-              <strong className="text-sm md:text-base text-white uppercase font-black">QR PASS + GUIA</strong>
-            </div>
-          </div>
-        </section>
 
-        {/* ÁREA PRINCIPAL: FORMULÁRIO OU TICKET DE CONFIRMAÇÃO */}
-        <section className="mb-20">
-          {ticketData ? (
-            <TicketBadge
-              queuePosition={ticketData.queue_position}
-              name={ticketData.name}
-              phone={ticketData.phone}
-              email={ticketData.email}
-              createdAt={ticketData.created_at}
-              alreadyRegistered={ticketData.already_registered}
-              onReset={() => setTicketData(null)}
-            />
-          ) : (
-            <QueueForm onSuccess={(data) => setTicketData(data)} />
-          )}
-        </section>
-
-        {/* SEÇÃO DE BRANDING DO EVENTO (EPIC 1 - USER STORY 2) */}
-        <EventBranding />
-
-        {/* FLUXO PASSO A PASSO (CONFORME O DEBRIEF) */}
-        <section className="border-t border-zinc-800 pt-16 pb-12">
-          <div className="text-center mb-12">
-            <span className="text-[10px] font-mono text-[#FF5722] uppercase tracking-widest block mb-1">
-              // ARQUITETURA DO PROCESSO
+            {/* Subtítulo em Ultravioleta */}
+            <span className="font-persona text-2xl sm:text-3xl tracking-widest text-[#8A3CFF] uppercase block leading-none">
+              A NOITE DAS MÁSCARAS
             </span>
-            <h2 className="ascend-font text-3xl md:text-5xl uppercase tracking-tight text-white">
-              COMO FUNCIONA O <span className="text-yellow-ascend">SISTEMA</span>
-            </h2>
+
+            {/* Wordmark Principal BAILE DA LAGOA em Anton Cromo */}
+            <h1 className="font-persona text-6xl sm:text-7xl md:text-8xl text-[#E8E8EF] tracking-tight leading-[0.88] uppercase mb-4">
+              BAILE DA <span className="text-[#E8E8EF]">LAGOA</span>
+            </h1>
+
+            {/* Dados do Flyer em Space Mono */}
+            <div className="font-data text-xs sm:text-sm text-[#5B5B66] uppercase tracking-wider mb-6">
+              31.10 — 20H ATÉ DE MADRUGADA — SJC
+            </div>
+
+            {/* Regra de Ouro (Copy Seco e Direto Oficial da Marca) */}
+            <div className="border-l-2 border-[#8A3CFF] pl-4 py-1 mb-6 animate-stack-2">
+              <h2 className="font-persona text-xl sm:text-2xl text-[#E8E8EF] uppercase tracking-wide leading-tight">
+                UMA FESTA. UMA REGRA.
+                <br />
+                <span className="text-[#FF2E3B]">NINGUÉM ENTRA DE CARA LIMPA.</span>
+              </h2>
+              <p className="font-data text-[11px] text-[#5B5B66] uppercase tracking-wide mt-2 leading-relaxed">
+                O baile de máscaras da cidade. Uma noite por ano. Você não sabe quem está do seu lado, e é isso que faz a noite.
+              </p>
+            </div>
+
+            {/* Pilulas de Informação Rápida (The Stack Style) */}
+            <div className="grid grid-cols-3 gap-2 font-data text-[10px] uppercase text-[#E8E8EF] mb-4 animate-stack-3">
+              <div className="bg-[#141418] border border-[#1F1F24] hover:border-[#8A3CFF]/40 p-2.5 text-center transition-all duration-200">
+                <span className="text-[#5B5B66] block text-[8px] mb-0.5">OPEN BAR</span>
+                <strong className="text-[#8A3CFF]">NOITE TODA</strong>
+              </div>
+              <div className="bg-[#141418] border border-[#1F1F24] hover:border-[#8A3CFF]/40 p-2.5 text-center transition-all duration-200">
+                <span className="text-[#5B5B66] block text-[8px] mb-0.5">SOM</span>
+                <span>DJ SET ATÉ 05H</span>
+              </div>
+              <div className="bg-[#141418] border border-[#1F1F24] hover:border-[#8A3CFF]/40 p-2.5 text-center transition-all duration-200">
+                <span className="text-[#5B5B66] block text-[8px] mb-0.5">ACESSO</span>
+                <span className="text-[#FF2E3B] font-bold">1º LOTE</span>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-zinc-950 border-2 border-zinc-800 p-6 relative">
-              <div className="ascend-font text-3xl text-[#FF5722] mb-3">01</div>
-              <h4 className="font-bold uppercase text-sm tracking-wide mb-2 text-white">Inscrição na Fila</h4>
-              <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                Você cadastra seu WhatsApp e e-mail. A data e hora exatas determinam sua posição imutável.
-              </p>
+          {/* COLUNA DIREITA: CARD DE AÇÃO LIMPO OU BILHETE */}
+          <div className="lg:col-span-6 w-full">
+            {ticketData ? (
+              <TicketBadge
+                queuePosition={ticketData.queue_position}
+                name={ticketData.name}
+                phone={ticketData.phone}
+                email={ticketData.email}
+                createdAt={ticketData.created_at}
+                alreadyRegistered={ticketData.already_registered}
+                onReset={() => setTicketData(null)}
+              />
+            ) : (
+              <div className="bg-[#141418] border border-[#1F1F24] p-6 sm:p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden animate-stack-2">
+                {/* Linha decorativa de topo Ultravioleta */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#8A3CFF] via-[#FF2E3B] to-[#8A3CFF]" />
+
+                {/* Status da Fila */}
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#1F1F24]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#8A3CFF] pulse-livestream" />
+                    <span className="font-data text-[10px] text-[#E8E8EF] uppercase tracking-widest font-bold">
+                      PRÉ-VENDA ABERTA
+                    </span>
+                  </div>
+                  <span className="font-data text-[9px] text-[#8A3CFF] bg-[#8A3CFF]/10 px-2 py-0.5 border border-[#8A3CFF]/20 uppercase tracking-widest">
+                    LOTE 01
+                  </span>
+                </div>
+
+                {/* Conteúdo Central do Card */}
+                <div className="space-y-4 my-2">
+                  <div className="flex items-center gap-3">
+                    <PersonaMaskIcon className="w-8 h-5" fillColor="#8A3CFF" />
+                    <span className="font-persona text-2xl uppercase tracking-wider text-[#E8E8EF]">
+                      ACESSO ANTECIPADO
+                    </span>
+                  </div>
+
+                  <p className="font-data text-xs text-[#5B5B66] uppercase leading-relaxed tracking-wide">
+                    Garanta prioridade na compra antes da abertura ao público geral. Vagas limitadas para o 1º lote.
+                  </p>
+
+                  <div className="bg-[#0B0B0D] border border-[#1F1F24] p-3 text-[11px] font-data text-[#E8E8EF] flex items-center justify-between">
+                    <span className="text-[#5B5B66]">VALOR DE ENTRADA NA FILA:</span>
+                    <strong className="text-[#8A3CFF]">GRATUITO (R$ 0,00)</strong>
+                  </div>
+                </div>
+
+                {/* BOTÃO PRINCIPAL DE AÇÃO: DISPARA O MODAL */}
+                <div className="mt-8 space-y-3">
+                  <button
+                    onClick={() => setIsJoinModalOpen(true)}
+                    className="w-full bg-[#FF2E3B] hover:bg-[#ff424e] active:scale-[0.99] text-[#E8E8EF] font-persona text-xl sm:text-2xl uppercase py-4 px-6 tracking-wider flex items-center justify-center gap-3 transition-all duration-200 shadow-[0_0_25px_rgba(255,46,59,0.3)] hover:shadow-[0_0_35px_rgba(255,46,59,0.5)] cursor-pointer"
+                  >
+                    <span>ENTRAR NA FILA DO 1º LOTE</span>
+                    <ArrowRight className="w-5 h-5 text-white" />
+                  </button>
+
+                  <div className="flex items-center justify-between text-[10px] font-data text-[#5B5B66] uppercase px-1 pt-1">
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-[#8A3CFF]" />
+                      Confirmação via WhatsApp e E-mail
+                    </span>
+                    <button
+                      onClick={() => setIsCheckModalOpen(true)}
+                      className="text-[#8A3CFF] hover:underline"
+                    >
+                      Já se cadastrou?
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ACCORDION COMPACTO DE DETALHES (ZERO SCROLL FATIGUE) */}
+        <div className="mt-8 pt-6 border-t border-[#1F1F24] max-w-3xl mx-auto w-full font-data text-xs animate-stack-4">
+          <div className="flex items-center justify-between mb-3 text-[10px] uppercase text-[#5B5B66]">
+            <span>// GUIA DO BAILE</span>
+            <span>TOQUE PARA VER DETALHES</span>
+          </div>
+
+          <div className="space-y-2">
+            {/* O QUE ROLA */}
+            <div className="bg-[#141418] border border-[#1F1F24] hover:border-[#2A2A32] transition-colors">
+              <button
+                onClick={() => toggleTab('info')}
+                className="w-full p-3.5 flex items-center justify-between text-left text-xs uppercase font-bold text-[#E8E8EF] hover:text-[#8A3CFF] transition-colors"
+              >
+                <span>01 · O QUE ROLA</span>
+                {activeTab === 'info' ? <ChevronUp className="w-4 h-4 text-[#8A3CFF]" /> : <ChevronDown className="w-4 h-4 text-[#5B5B66]" />}
+              </button>
+              {activeTab === 'info' && (
+                <div className="px-4 pb-4 pt-1 text-[#5B5B66] border-t border-[#1F1F24] space-y-1.5 text-[11px] leading-relaxed animate-in fade-in duration-200">
+                  <p>· DJ set até de madrugada (House, Melodic, Dark Disco).</p>
+                  <p>· Bar aberto a noite toda.</p>
+                  <p>· Máscara obrigatória durante todo o evento.</p>
+                  <p>· Local secreto em São José dos Campos revelado no bilhete oficial.</p>
+                </div>
+              )}
             </div>
 
-            <div className="bg-zinc-950 border-2 border-zinc-800 p-6 relative">
-              <div className="ascend-font text-3xl text-yellow-ascend mb-3">02</div>
-              <h4 className="font-bold uppercase text-sm tracking-wide mb-2 text-white">Liberação por Lotes</h4>
-              <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                Na abertura do lote, o sistema notifica os primeiros da fila com link exclusivo de pagamento.
-              </p>
+            {/* DRESS CODE & REGRA */}
+            <div className="bg-[#141418] border border-[#1F1F24] hover:border-[#2A2A32] transition-colors">
+              <button
+                onClick={() => toggleTab('regras')}
+                className="w-full p-3.5 flex items-center justify-between text-left text-xs uppercase font-bold text-[#E8E8EF] hover:text-[#FF2E3B] transition-colors"
+              >
+                <span>02 · A REGRA DA MÁSCARA</span>
+                {activeTab === 'regras' ? <ChevronUp className="w-4 h-4 text-[#FF2E3B]" /> : <ChevronDown className="w-4 h-4 text-[#5B5B66]" />}
+              </button>
+              {activeTab === 'regras' && (
+                <div className="px-4 pb-4 pt-1 text-[#5B5B66] border-t border-[#1F1F24] space-y-1.5 text-[11px] leading-relaxed animate-in fade-in duration-200">
+                  <p className="text-[#E8E8EF] font-bold">SEM MÁSCARA, SEM ENTRADA.</p>
+                  <p>Qualquer máscara vale: veneziana, moderna, avant-garde. Compre, faça ou improvise. Só não chega de cara limpa.</p>
+                  <p>Paleta sugerida: All Black & Dark Minimalist.</p>
+                </div>
+              )}
             </div>
 
-            <div className="bg-zinc-950 border-2 border-zinc-800 p-6 relative">
-              <div className="ascend-font text-3xl text-white mb-3">03</div>
-              <h4 className="font-bold uppercase text-sm tracking-wide mb-2 text-white">Pagamento PIX</h4>
-              <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                PIX com QR Code dinâmico e tempo de expiração seguro. Sem pagamento a tempo, a vaga passa para o próximo.
-              </p>
-            </div>
-
-            <div className="bg-zinc-950 border-2 border-zinc-800 p-6 relative">
-              <div className="ascend-font text-3xl text-[#FF5722] mb-3">04</div>
-              <h4 className="font-bold uppercase text-sm tracking-wide mb-2 text-white">Ingresso & Dress Code</h4>
-              <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                Com a compensação antifraude, seu ingresso digital com QR Code e manual de instruções são liberados.
-              </p>
+            {/* COMO FUNCIONA A PRÉ-VENDA */}
+            <div className="bg-[#141418] border border-[#1F1F24] hover:border-[#2A2A32] transition-colors">
+              <button
+                onClick={() => toggleTab('faq')}
+                className="w-full p-3.5 flex items-center justify-between text-left text-xs uppercase font-bold text-[#E8E8EF] hover:text-[#8A3CFF] transition-colors"
+              >
+                <span>03 · COMO FUNCIONA O LOTE 1</span>
+                {activeTab === 'faq' ? <ChevronUp className="w-4 h-4 text-[#8A3CFF]" /> : <ChevronDown className="w-4 h-4 text-[#5B5B66]" />}
+              </button>
+              {activeTab === 'faq' && (
+                <div className="px-4 pb-4 pt-1 text-[#5B5B66] border-t border-[#1F1F24] space-y-2 text-[11px] leading-relaxed animate-in fade-in duration-200">
+                  <p><strong className="text-[#E8E8EF]">Prioridade na pré-venda:</strong> Quem se cadastra primeiro recebe o acesso ao 1º Lote direto no WhatsApp e e-mail com chave PIX exclusiva.</p>
+                  <p><strong className="text-[#E8E8EF]">Inscrição gratuita:</strong> Entrar na lista de pré-venda não tem nenhum custo.</p>
+                  <p><strong className="text-[#E8E8EF]">Tempo limite de pagamento:</strong> Cada liberação possui um prazo de validade. Não pagando dentro do prazo, a vaga passa para o próximo da lista.</p>
+                </div>
+              )}
             </div>
           </div>
-        </section>
-
-        {/* SEÇÃO FAQ */}
-        <FaqSection />
+        </div>
       </main>
 
       {/* FOOTER */}
-      <footer className="no-print border-t-2 border-white/10 bg-black py-8 px-4 text-center font-mono text-[11px] text-zinc-500 z-10">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <footer className="no-print border-t border-[#1F1F24] py-4 px-4 font-data text-[10px] text-[#5B5B66] uppercase">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-[#FF5722]" />
-            <span className="text-zinc-300 uppercase font-black">MASK PARTY // GESTÃO DE ACESSOS</span>
+            <PersonaMaskIcon className="w-4 h-2.5" fillColor="#8A3CFF" />
+            <span>BAILE DA LAGOA · 31.10 · SJC</span>
           </div>
 
-          <div className="flex items-center gap-4 text-[10px] uppercase">
-            <span>Powered by Supabase</span>
-            <span>•</span>
-            <span>Deployed on Vercel</span>
-            <span>•</span>
-            <a
+          <div className="flex items-center gap-3">
+            <span>SEM MÁSCARA, SEM ENTRADA</span>
+            <span>·</span>
+            <Link
               href="/admin"
-              className="text-zinc-400 hover:text-[#FF5722] flex items-center gap-1 transition-colors"
-              title="Acesso Administrativo"
+              className="text-[#5B5B66] hover:text-[#8A3CFF] flex items-center gap-1 transition-colors"
             >
-              <Lock className="w-3 h-3 text-[#FF5722]" />
-              <span>Painel Admin</span>
-            </a>
+              <Lock className="w-2.5 h-2.5" />
+              <span>Admin</span>
+            </Link>
           </div>
         </div>
       </footer>
 
-      {/* Modal de Busca de Posição */}
+      {/* MODAL DE CADASTRO / ENTRAR NA FILA */}
+      <JoinQueueModal
+        isOpen={isJoinModalOpen}
+        onClose={() => setIsJoinModalOpen(false)}
+        onSuccess={(data) => setTicketData(data)}
+      />
+
+      {/* MODAL DE CONSULTA DE LUGAR */}
       <CheckStatusModal
         isOpen={isCheckModalOpen}
         onClose={() => setIsCheckModalOpen(false)}
         onFound={(data) => setTicketData(data)}
-      />
-
-      {/* Modal de QR Code de Divulgação (Marketing / Posters) */}
-      <CampaignQrModal
-        isOpen={isCampaignQrOpen}
-        onClose={() => setIsCampaignQrOpen(false)}
       />
     </div>
   );

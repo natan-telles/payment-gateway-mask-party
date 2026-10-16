@@ -17,11 +17,10 @@ import {
   ArrowLeft,
   Mail,
   Send,
-  AlertTriangle,
   X,
-  Sparkles,
-  Check,
 } from 'lucide-react';
+import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
+import { AdminNavTabs } from '@/components/AdminNavTabs';
 import { WaitingQueueEntry } from '@/types/database';
 
 export default function AdminPage() {
@@ -43,7 +42,6 @@ export default function AdminPage() {
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
 
-  // Estados do Epic 3 (Comunicação e Liberação de Lote)
   const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
   const [batchCount, setBatchCount] = useState(10);
   const [expirationHours, setExpirationHours] = useState(12);
@@ -53,7 +51,6 @@ export default function AdminPage() {
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [reminderFeedback, setReminderFeedback] = useState<string | null>(null);
 
-  // Recupera senha salva na sessão
   useEffect(() => {
     const saved = sessionStorage.getItem('mask_party_admin_pw');
     if (saved) {
@@ -216,29 +213,26 @@ export default function AdminPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `mask-party-fila-${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `baile-persona-fila-${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Enviar WhatsApp direto com template da Mask Party (Semi-automático)
   const handleNotifyWhatsApp = (lead: WaitingQueueEntry) => {
     const rawPhone = lead.phone.replace(/\D/g, '');
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
     const text = encodeURIComponent(
-      `Olá, ${lead.name.split(' ')[0]}! 🎭\n\nSua prioridade na fila da *MASK PARTY 2026* chegou! (Posição #${lead.queue_position}).\n\nSeu acesso exclusivo para compra de ingresso no 1º Lote está liberado. Complete seu pagamento via PIX para garantir sua vaga antes do tempo limite de expiração.\n\nAcesse o link de compra: ${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`
+      `Olá, ${lead.name.split(' ')[0]}!\n\nSua prioridade na fila do *BAILE PERSONA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).\n\nSeu acesso para compra de ingresso no 1º Lote está liberado por tempo limitado.\n\nLink de compra: ${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`
     );
 
     const waUrl = `https://wa.me/${phoneWithDDI}?text=${text}`;
     window.open(waUrl, '_blank');
 
-    // Marca como notificado automaticamente
     updateStatus(lead.id, { notification_status: 'sent' });
   };
 
-  // Liberação de Lote de Ingressos por E-mail (Epic 3)
   const handleReleaseBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsReleasing(true);
@@ -258,21 +252,20 @@ export default function AdminPage() {
 
       if (res.ok && data.success) {
         const mode = data.simulated ? ' (Modo Simulação)' : ' (Resend Real)';
-        setReleaseFeedback(`✅ Sucesso! ${data.releasedCount} participante(s) notificado(s) por e-mail na ordem da fila${mode}.`);
+        setReleaseFeedback(`Sucesso: ${data.releasedCount} participante(s) notificado(s) na ordem da fila${mode}.`);
         fetchLeads();
       } else {
-        setReleaseFeedback(`❌ Erro: ${data.error || 'Falha ao liberar lote.'}`);
+        setReleaseFeedback(`Erro: ${data.error || 'Falha ao liberar lote.'}`);
       }
     } catch {
-      setReleaseFeedback('❌ Erro na conexão ao disparar lote.');
+      setReleaseFeedback('Erro de conexão ao disparar lote.');
     } finally {
       setIsReleasing(false);
     }
   };
 
-  // Disparo de Lembretes de Pagamento / Expiração (Epic 3)
   const handleSendReminders = async () => {
-    if (!confirm('Deseja disparar e-mails de lembrete para todos os participantes que estão com pagamento pendente?')) return;
+    if (!confirm('Deseja disparar e-mails de lembrete para todos os participantes com pagamento pendente?')) return;
 
     setIsSendingReminders(true);
     setReminderFeedback(null);
@@ -289,7 +282,7 @@ export default function AdminPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setReminderFeedback(`📢 Lembretes enviados para ${data.remindedCount} participante(s) pendente(s).`);
+        setReminderFeedback(`Lembretes enviados para ${data.remindedCount} participante(s).`);
         setTimeout(() => setReminderFeedback(null), 5000);
       } else {
         alert(data.error || 'Erro ao enviar lembretes.');
@@ -301,56 +294,55 @@ export default function AdminPage() {
     }
   };
 
-  // TELA DE LOGIN DO ADMIN
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-sm bg-black border-2 border-white p-8 shadow-[8px_8px_0px_0px_#FF5722] text-center">
-          <div className="w-12 h-12 bg-black border border-white mx-auto flex items-center justify-center mb-4 text-[#FF5722]">
-            <Lock className="w-6 h-6" />
+      <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-[#141418] border border-[#1F1F24] p-8 text-center shadow-2xl">
+          <div className="w-10 h-10 bg-[#8A3CFF] mx-auto flex items-center justify-center mb-4">
+            <PersonaMaskIcon className="w-6 h-4" fillColor="#0B0B0D" />
           </div>
 
-          <span className="text-[10px] uppercase font-mono tracking-widest text-[#FF5722] block mb-1">
+          <span className="font-data text-[10px] uppercase text-[#8A3CFF] tracking-widest block mb-1">
             // ÁREA RESTRITA
           </span>
-          <h1 className="ascend-font text-3xl uppercase tracking-tight text-white mb-2">
-            ADMIN <span className="text-yellow-ascend">DASHBOARD</span>
+          <h1 className="font-persona text-3xl uppercase tracking-tight text-[#E8E8EF] mb-2">
+            ADMIN DASHBOARD
           </h1>
-          <p className="text-xs text-zinc-400 mb-6 font-mono">
-            Painel de controle e gerenciamento da fila da Mask Party.
+          <p className="text-xs text-[#5B5B66] mb-6 font-data">
+            Baile Persona · Controle de Fila e Ingressos
           </p>
 
           {authError && (
-            <div className="mb-4 p-2.5 bg-red-950/80 border border-red-500 text-red-200 text-xs font-bold font-mono">
+            <div className="mb-4 p-2.5 bg-red-950/60 border border-[#FF2E3B]/50 text-[#FF2E3B] text-xs font-data">
               {authError}
             </div>
           )}
 
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
+          <form onSubmit={handleLoginSubmit} className="space-y-4 font-data">
             <input
               type="password"
               placeholder="SENHA DE ACESSO"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 font-mono text-center text-lg tracking-widest uppercase outline-none"
+              className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-3 text-center text-sm tracking-widest uppercase outline-none"
               autoFocus
             />
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#FF5722] hover:bg-orange-500 text-black font-black py-3 px-4 uppercase text-xs tracking-wider border-2 border-black transition-colors"
+              className="w-full bg-[#8A3CFF] hover:bg-[#9a54ff] text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal transition-colors"
             >
-              {loading ? 'Verificando...' : 'Entrar no Painel'}
+              {loading ? 'VERIFICANDO...' : 'ENTRAR NO PAINEL'}
             </button>
           </form>
 
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-white text-xs font-mono uppercase mt-6 transition-colors"
+            className="inline-flex items-center gap-1.5 text-[#5B5B66] hover:text-[#E8E8EF] text-xs font-data uppercase mt-6 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Voltar para a Landing Page</span>
+            <span>Voltar ao site</span>
           </Link>
         </div>
       </div>
@@ -359,202 +351,173 @@ export default function AdminPage() {
 
   const waitingCount = metrics.total - metrics.notifiedCount;
 
-  // TELA PRINCIPAL DO PAINEL ADMIN
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8 font-sans">
-      {/* Top Bar */}
-      <header className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-zinc-800 pb-6 mb-8">
-        <div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="p-1.5 bg-zinc-900 border border-zinc-700 hover:border-[#FF5722] text-zinc-400 hover:text-white transition-colors"
-              title="Voltar ao site"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <span className="ascend-font text-3xl uppercase tracking-tight">
-              MASK PARTY <span className="text-[#FF5722]">// ADMIN DASHBOARD</span>
+    <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] p-4 md:p-8 font-sans">
+      <header className="max-w-7xl mx-auto border-b border-[#1F1F24] pb-6 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/"
+                className="p-1.5 bg-[#141418] border border-[#1F1F24] hover:border-[#8A3CFF] text-[#5B5B66] hover:text-[#E8E8EF] transition-colors"
+                title="Voltar ao site"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+              <div className="flex items-center gap-2">
+                <PersonaMaskIcon className="w-5 h-3.5" fillColor="#8A3CFF" />
+                <span className="font-persona text-3xl uppercase tracking-tight text-[#E8E8EF]">
+                  BAILE PERSONA <span className="text-[#8A3CFF]">// ADMIN</span>
+                </span>
+              </div>
+            </div>
+            <span className="font-data text-[10px] text-[#5B5B66] uppercase tracking-widest block mt-1">
+              GESTÃO DA FILA IMUTÁVEL · 31.10 · SJC
             </span>
           </div>
-          <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest block mt-1">
-            EPIC 2, 3 & 4: GESTÃO DA FILA IMUTÁVEL, COMUNICAÇÃO & ANALYTICS
-          </span>
+
+          <div className="flex items-center gap-3 font-data text-xs">
+            <button
+              onClick={() => fetchLeads()}
+              disabled={loading}
+              className="flex items-center gap-2 bg-[#141418] hover:bg-[#1f1f24] border border-[#1F1F24] px-3.5 py-2 uppercase text-[#E8E8EF] transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#8A3CFF] ${loading ? 'animate-spin' : ''}`} />
+              <span>Atualizar</span>
+            </button>
+
+            <button
+              onClick={handleExportCsv}
+              disabled={!leads.length}
+              className="flex items-center gap-2 bg-[#141418] hover:bg-[#1f1f24] border border-[#1F1F24] px-3.5 py-2 uppercase text-[#8A3CFF] transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Exportar CSV</span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="bg-red-950/40 hover:bg-red-900 border border-red-800 px-3.5 py-2 uppercase text-red-300 transition-colors"
+            >
+              Sair
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 font-mono">
-          <button
-            onClick={() => fetchLeads()}
-            disabled={loading}
-            className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-3.5 py-2 text-xs uppercase text-zinc-300 transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-yellow-ascend ${loading ? 'animate-spin' : ''}`} />
-            <span>Atualizar</span>
-          </button>
-
-          <button
-            onClick={handleExportCsv}
-            disabled={!leads.length}
-            className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-3.5 py-2 text-xs uppercase text-[#FF5722] transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Exportar CSV</span>
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="bg-red-950/60 hover:bg-red-900 border border-red-700 px-3.5 py-2 text-xs uppercase text-red-200 transition-colors"
-          >
-            Sair
-          </button>
-        </div>
+        {/* Abas Padronizadas com Ícones da Paleta */}
+        <AdminNavTabs activeTab="queue" />
       </header>
 
-      {/* Abas de Navegação do Admin */}
-      <div className="max-w-7xl mx-auto flex items-center gap-2 font-mono text-xs mb-8">
-        <div className="px-4 py-2 bg-[#FF5722] text-black font-black border-2 border-white/80 uppercase tracking-wider shadow-[2px_2px_0px_0px_#fff]">
-          📋 Gestão da Fila
-        </div>
-        <Link
-          href="/admin/analytics"
-          className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-700 uppercase tracking-wider transition-colors flex items-center gap-1.5"
-        >
-          <span>📊 Métricas & Analytics</span>
-        </Link>
-      </div>
-
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* CARDS DE MÉTRICAS */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-black border-2 border-zinc-800 p-5 shadow-[4px_4px_0px_0px_#FF5722]">
-            <div className="flex items-center justify-between text-zinc-500 mb-2">
-              <span className="text-[10px] font-mono uppercase font-black">TOTAL NA FILA</span>
-              <Users className="w-4 h-4 text-[#FF5722]" />
-            </div>
-            <div className="ascend-font text-5xl text-white leading-none">{metrics.total}</div>
-            <span className="text-[10px] font-mono text-zinc-500 block mt-2">Leads únicos registrados</span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-data">
+          <div className="bg-[#141418] border border-[#1F1F24] p-4">
+            <span className="text-[10px] text-[#5B5B66] uppercase block">TOTAL NA FILA</span>
+            <div className="font-persona text-4xl text-[#E8E8EF] mt-1">{metrics.total}</div>
+            <span className="text-[9px] text-[#5B5B66] block mt-1">Inscritos únicos</span>
           </div>
 
-          <div className="bg-black border-2 border-zinc-800 p-5 shadow-[4px_4px_0px_0px_#F3FF33]">
-            <div className="flex items-center justify-between text-zinc-500 mb-2">
-              <span className="text-[10px] font-mono uppercase font-black">NOTIFICADOS</span>
-              <Bell className="w-4 h-4 text-yellow-ascend" />
-            </div>
-            <div className="ascend-font text-5xl text-yellow-ascend leading-none">
-              {metrics.notifiedCount}
-            </div>
-            <span className="text-[10px] font-mono text-zinc-500 block mt-2">Chamados para comprar</span>
+          <div className="bg-[#141418] border border-[#1F1F24] p-4">
+            <span className="text-[10px] text-[#5B5B66] uppercase block">CONVOCADOS</span>
+            <div className="font-persona text-4xl text-[#8A3CFF] mt-1">{metrics.notifiedCount}</div>
+            <span className="text-[9px] text-[#5B5B66] block mt-1">E-mails disparados</span>
           </div>
 
-          <div className="bg-black border-2 border-zinc-800 p-5 shadow-[4px_4px_0px_0px_#22c55e]">
-            <div className="flex items-center justify-between text-zinc-500 mb-2">
-              <span className="text-[10px] font-mono uppercase font-black">PAGOS / INGRESSO</span>
-              <CheckCircle className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="ascend-font text-5xl text-emerald-400 leading-none">
-              {metrics.paidCount}
-            </div>
-            <span className="text-[10px] font-mono text-zinc-500 block mt-2">Ingressos emitidos</span>
+          <div className="bg-[#141418] border border-[#1F1F24] p-4">
+            <span className="text-[10px] text-[#5B5B66] uppercase block">PAGOS / INGRESSOS</span>
+            <div className="font-persona text-4xl text-emerald-400 mt-1">{metrics.paidCount}</div>
+            <span className="text-[9px] text-[#5B5B66] block mt-1">PIX confirmados</span>
           </div>
 
-          <div className="bg-black border-2 border-zinc-800 p-5 shadow-[4px_4px_0px_0px_#f97316]">
-            <div className="flex items-center justify-between text-zinc-500 mb-2">
-              <span className="text-[10px] font-mono uppercase font-black">PAGTO. PENDENTE</span>
-              <Clock className="w-4 h-4 text-orange-400" />
-            </div>
-            <div className="ascend-font text-5xl text-orange-400 leading-none">
-              {metrics.pendingPaymentCount}
-            </div>
-            <span className="text-[10px] font-mono text-zinc-500 block mt-2">Aguardando PIX</span>
+          <div className="bg-[#141418] border border-[#1F1F24] p-4">
+            <span className="text-[10px] text-[#5B5B66] uppercase block">PAGTO. PENDENTE</span>
+            <div className="font-persona text-4xl text-[#FF2E3B] mt-1">{metrics.pendingPaymentCount}</div>
+            <span className="text-[9px] text-[#5B5B66] block mt-1">Aguardando PIX</span>
           </div>
         </div>
 
-        {/* CENTRO DE CONTROLE DE COMUNICAÇÃO & LIBERAÇÃO DE LOTES (EPIC 3) */}
-        <div className="bg-zinc-950 border-2 border-white/30 p-6 shadow-[6px_6px_0px_0px_#FF5722] flex flex-col md:flex-row items-center justify-between gap-6">
+        {/* BARRA DE AÇÃO: LIBERAÇÃO DE LOTE E LEMBRETES */}
+        <div className="bg-[#141418] border border-[#1F1F24] p-5 flex flex-col md:flex-row items-center justify-between gap-4 font-data text-xs">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Mail className="w-4 h-4 text-[#FF5722]" />
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[#FF5722]">
-                // AUTOMAÇÃO DE NOTIFICAÇÕES & DISPARO
-              </span>
-            </div>
-            <h3 className="ascend-font text-2xl uppercase tracking-tight text-white">
-              LIBERAÇÃO DE <span className="text-yellow-ascend">LOTES DA FILA</span>
-            </h3>
-            <p className="text-xs text-zinc-400 font-sans max-w-xl mt-1">
-              Convoca os próximos inscritos por <strong>ordem cronológica imutável</strong>. Dispara e-mails oficiais com o botão de pagamento PIX e prazo de validade.
+            <span className="text-[10px] text-[#8A3CFF] uppercase tracking-widest block mb-0.5">
+              // DISPARO OFICIAL
+            </span>
+            <strong className="text-sm uppercase text-[#E8E8EF]">
+              Liberação de Lote por E-mail
+            </strong>
+            <p className="text-[11px] text-[#5B5B66] mt-0.5">
+              Convoca os próximos inscritos respeitando estritamente o carimbo de entrada na fila.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto font-mono">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => {
                 setReleaseFeedback(null);
                 setIsReleaseModalOpen(true);
               }}
-              className="bg-[#FF5722] hover:bg-orange-500 text-black font-black py-3 px-5 uppercase text-xs tracking-wider flex items-center gap-2 border-2 border-black shadow-[2px_2px_0px_0px_#fff] transition-transform active:translate-y-0.5"
+              className="bg-[#8A3CFF] hover:bg-[#9a54ff] text-[#0B0B0D] font-bold py-2.5 px-4 uppercase text-xs tracking-wider flex items-center gap-1.5 transition-colors"
             >
-              <Send className="w-4 h-4" />
-              <span>Liberar Próximo Lote</span>
+              <Send className="w-3.5 h-3.5" />
+              <span>Liberar Lote</span>
             </button>
 
             <button
               onClick={handleSendReminders}
               disabled={isSendingReminders || metrics.pendingPaymentCount === 0}
-              className="bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white font-bold py-3 px-4 uppercase text-xs tracking-wider flex items-center gap-2 border border-zinc-700 transition-colors"
-              title="Disparar lembrete de expiração para quem ainda não pagou"
+              className="bg-[#0B0B0D] hover:bg-[#1f1f24] disabled:opacity-40 text-[#E8E8EF] py-2.5 px-3.5 uppercase text-xs tracking-wider border border-[#1F1F24] flex items-center gap-1.5 transition-colors"
             >
-              <Clock className="w-4 h-4 text-yellow-ascend" />
-              <span>Disparar Lembretes ({metrics.pendingPaymentCount})</span>
+              <Clock className="w-3.5 h-3.5 text-[#8A3CFF]" />
+              <span>Lembretes ({metrics.pendingPaymentCount})</span>
             </button>
           </div>
         </div>
 
         {reminderFeedback && (
-          <div className="p-3 bg-yellow-950/80 border border-yellow-500 text-yellow-200 text-xs font-mono font-bold">
+          <div className="p-3 bg-[#141418] border border-[#8A3CFF] text-[#E8E8EF] text-xs font-data">
             {reminderFeedback}
           </div>
         )}
 
-        {/* BARRA DE FILTROS & BUSCA */}
-        <div className="bg-zinc-950 border-2 border-zinc-800 p-4 flex flex-col md:flex-row items-center gap-4">
+        {/* FILTROS E BUSCA */}
+        <div className="bg-[#141418] border border-[#1F1F24] p-3 flex flex-col md:flex-row items-center gap-3 font-data text-xs">
           <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-3.5" />
+            <Search className="w-3.5 h-3.5 text-[#5B5B66] absolute left-3 top-3" />
             <input
               type="text"
               placeholder="Buscar por nome, WhatsApp ou e-mail..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 pl-9 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 font-mono outline-none focus:border-[#FF5722]"
+              className="w-full bg-[#0B0B0D] border border-[#1F1F24] pl-9 pr-3 py-2 text-xs text-[#E8E8EF] placeholder-[#5B5B66] outline-none focus:border-[#8A3CFF]"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto font-mono text-xs">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <select
               value={notificationFilter}
               onChange={(e) => setNotificationFilter(e.target.value)}
-              className="bg-zinc-900 border border-zinc-700 text-zinc-300 p-2.5 outline-none text-xs"
+              className="bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] p-2 outline-none text-xs"
             >
               <option value="all">Notificação: Todas</option>
-              <option value="pending">Notificação: Pendente</option>
-              <option value="sent">Notificação: Enviada</option>
+              <option value="pending">Pendente</option>
+              <option value="sent">Enviada</option>
             </select>
 
             <select
               value={paymentFilter}
               onChange={(e) => setPaymentFilter(e.target.value)}
-              className="bg-zinc-900 border border-zinc-700 text-zinc-300 p-2.5 outline-none text-xs"
+              className="bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] p-2 outline-none text-xs"
             >
               <option value="all">Pagamento: Todos</option>
-              <option value="pending">Pagamento: Pendente</option>
-              <option value="approved">Pagamento: Aprovado</option>
-              <option value="expired">Pagamento: Expirado</option>
+              <option value="pending">Pendente</option>
+              <option value="approved">Aprovado</option>
+              <option value="expired">Expirado</option>
             </select>
 
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="bg-zinc-900 border border-zinc-700 text-zinc-300 p-2.5 outline-none text-xs"
+              className="bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] p-2 outline-none text-xs"
             >
               <option value="all">Origem: Todas</option>
               <option value="poster">Poster</option>
@@ -567,25 +530,25 @@ export default function AdminPage() {
         </div>
 
         {/* TABELA DE GESTÃO DA FILA */}
-        <div className="bg-black border-2 border-white/20 overflow-x-auto shadow-[6px_6px_0px_0px_#000]">
-          <table className="w-full text-left font-mono text-xs border-collapse">
+        <div className="bg-[#141418] border border-[#1F1F24] overflow-x-auto">
+          <table className="w-full text-left font-data text-xs border-collapse">
             <thead>
-              <tr className="bg-zinc-900 border-b-2 border-zinc-700 text-zinc-400 uppercase text-[10px]">
-                <th className="p-3.5 w-16 text-center">POS</th>
-                <th className="p-3.5">PARTICIPANTE</th>
-                <th className="p-3.5">WHATSAPP / CONTATO</th>
-                <th className="p-3.5">SEGMENTO</th>
-                <th className="p-3.5">ORIGEM</th>
-                <th className="p-3.5">DATA / HORA</th>
-                <th className="p-3.5">NOTIFICAÇÃO</th>
-                <th className="p-3.5">PAGAMENTO</th>
-                <th className="p-3.5 text-center">AÇÕES</th>
+              <tr className="bg-[#0B0B0D] border-b border-[#1F1F24] text-[#5B5B66] uppercase text-[9px]">
+                <th className="p-3 text-center">POS</th>
+                <th className="p-3">PARTICIPANTE</th>
+                <th className="p-3">CONTATO</th>
+                <th className="p-3">SEGMENTO</th>
+                <th className="p-3">ORIGEM</th>
+                <th className="p-3">REGISTRO</th>
+                <th className="p-3">NOTIFICAÇÃO</th>
+                <th className="p-3">PAGAMENTO</th>
+                <th className="p-3 text-center">AÇÕES</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800">
+            <tbody className="divide-y divide-[#1F1F24]">
               {leads.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-zinc-500 font-mono uppercase">
+                  <td colSpan={9} className="p-8 text-center text-[#5B5B66] uppercase">
                     {loading ? 'Carregando dados...' : 'Nenhum lead encontrado com os filtros aplicados.'}
                   </td>
                 </tr>
@@ -595,57 +558,47 @@ export default function AdminPage() {
                   const isPaid = lead.payment_status === 'approved';
 
                   return (
-                    <tr key={lead.id} className="hover:bg-zinc-950 transition-colors">
-                      {/* Posição Imutável */}
-                      <td className="p-3.5 text-center">
-                        <span className="ascend-font text-lg text-yellow-ascend font-black">
+                    <tr key={lead.id} className="hover:bg-[#1A1A20] transition-colors">
+                      <td className="p-3 text-center">
+                        <span className="font-persona text-base text-[#8A3CFF]">
                           #{String(lead.queue_position).padStart(4, '0')}
                         </span>
                       </td>
 
-                      {/* Nome e E-mail */}
-                      <td className="p-3.5">
-                        <strong className="block uppercase text-white font-sans text-sm">
+                      <td className="p-3">
+                        <strong className="block uppercase text-[#E8E8EF] text-xs">
                           {lead.name}
                         </strong>
-                        <span className="text-[11px] text-zinc-400 lowercase">{lead.email}</span>
+                        <span className="text-[10px] text-[#5B5B66] lowercase">{lead.email}</span>
                       </td>
 
-                      {/* WhatsApp com link rápido */}
-                      <td className="p-3.5">
+                      <td className="p-3">
                         <a
                           href={`https://wa.me/55${lead.phone.replace(/\D/g, '')}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold"
+                          className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold text-xs"
                           title="Abrir WhatsApp"
                         >
-                          <MessageSquare className="w-3.5 h-3.5" />
+                          <MessageSquare className="w-3 h-3" />
                           <span>{lead.phone}</span>
                         </a>
                       </td>
 
-                      {/* Bairro, Idade, Instagram */}
-                      <td className="p-3.5 text-[11px] text-zinc-400">
-                        {lead.neighborhood && <span className="block text-zinc-300">{lead.neighborhood}</span>}
-                        {lead.age && <span className="text-zinc-500">{lead.age} anos</span>}
-                        {lead.instagram && (
-                          <span className="text-yellow-ascend block font-sans">{lead.instagram}</span>
-                        )}
-                        {!lead.neighborhood && !lead.age && !lead.instagram && (
-                          <span className="text-zinc-600">--</span>
-                        )}
+                      <td className="p-3 text-[10px] text-[#5B5B66]">
+                        {lead.neighborhood && <span className="block text-[#E8E8EF]">{lead.neighborhood}</span>}
+                        {lead.age && <span>{lead.age} anos</span>}
+                        {lead.instagram && <span className="text-[#8A3CFF] block">{lead.instagram}</span>}
+                        {!lead.neighborhood && !lead.age && !lead.instagram && '--'}
                       </td>
 
-                      {/* Origem */}
-                      <td className="p-3.5">
-                        <span className="inline-block bg-zinc-900 border border-zinc-700 px-2 py-0.5 uppercase text-[9px] text-zinc-300">
+                      <td className="p-3">
+                        <span className="bg-[#0B0B0D] border border-[#1F1F24] px-1.5 py-0.5 uppercase text-[9px] text-[#5B5B66]">
                           {lead.source}
                         </span>
                       </td>
 
-                      {/* Data / Hora de Inscrição */}
-                      <td className="p-3.5 text-[11px] text-zinc-400 whitespace-nowrap">
+                      <td className="p-3 text-[10px] text-[#5B5B66] whitespace-nowrap">
                         {new Date(lead.created_at).toLocaleDateString('pt-BR', {
                           day: '2-digit',
                           month: '2-digit',
@@ -654,63 +607,58 @@ export default function AdminPage() {
                         })}
                       </td>
 
-                      {/* Status Notificação */}
-                      <td className="p-3.5">
+                      <td className="p-3">
                         <button
                           onClick={() =>
                             updateStatus(lead.id, {
                               notification_status: isNotified ? 'pending' : 'sent',
                             })
                           }
-                          className={`px-2.5 py-1 text-[10px] font-bold uppercase transition-colors ${
+                          className={`px-2 py-0.5 text-[9px] font-bold uppercase transition-colors ${
                             isNotified
-                              ? 'bg-yellow-ascend text-black'
-                              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                              ? 'bg-[#8A3CFF] text-[#0B0B0D]'
+                              : 'bg-[#0B0B0D] text-[#5B5B66] hover:text-[#E8E8EF]'
                           }`}
-                          title="Clique para alternar o status"
                         >
                           {isNotified ? 'Enviada' : 'Pendente'}
                         </button>
                       </td>
 
-                      {/* Status Pagamento */}
-                      <td className="p-3.5">
+                      <td className="p-3">
                         <button
                           onClick={() =>
                             updateStatus(lead.id, {
                               payment_status: isPaid ? 'pending' : 'approved',
                             })
                           }
-                          className={`px-2.5 py-1 text-[10px] font-bold uppercase transition-colors ${
+                          className={`px-2 py-0.5 text-[9px] font-bold uppercase transition-colors ${
                             isPaid
-                              ? 'bg-emerald-500 text-black'
+                              ? 'bg-emerald-500 text-[#0B0B0D]'
                               : lead.payment_status === 'expired'
-                              ? 'bg-red-900 text-red-200'
-                              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                              ? 'bg-[#FF2E3B] text-white'
+                              : 'bg-[#0B0B0D] text-[#5B5B66] hover:text-[#E8E8EF]'
                           }`}
-                          title="Clique para alternar status do pagamento"
                         >
                           {lead.payment_status.toUpperCase()}
                         </button>
                       </td>
 
-                      {/* Ações */}
-                      <td className="p-3.5 text-center">
+                      <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => handleNotifyWhatsApp(lead)}
-                            className="p-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold"
-                            title="Disparar link no WhatsApp (Semi-automático)"
+                            className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-[#0B0B0D] transition-colors"
+                            title="Disparar no WhatsApp"
                           >
-                            <MessageSquare className="w-3.5 h-3.5" />
+                            <ExternalLink className="w-3 h-3" />
                           </button>
 
                           <button
                             onClick={() => handleDelete(lead.id, lead.name)}
-                            className="p-1.5 bg-zinc-900 hover:bg-red-900 text-zinc-400 hover:text-white"
-                            title="Excluir da fila"
+                            className="p-1.5 bg-red-950/20 hover:bg-red-900 text-red-400 hover:text-white transition-colors"
+                            title="Excluir"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </td>
@@ -723,37 +671,37 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* MODAL DE LIBERAÇÃO DE LOTE POR E-MAIL */}
+      {/* MODAL DE LIBERAÇÃO DE LOTE */}
       {isReleaseModalOpen && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-950 text-white border-2 border-white w-full max-w-md p-6 relative shadow-[8px_8px_0px_0px_#FF5722]">
+        <div className="fixed inset-0 bg-[#0B0B0D]/90 backdrop-blur-md z-50 flex items-center justify-center p-4 font-data">
+          <div className="bg-[#141418] text-[#E8E8EF] border border-[#1F1F24] w-full max-w-sm p-6 relative shadow-2xl">
             <button
               onClick={() => setIsReleaseModalOpen(false)}
-              className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-[#5B5B66] hover:text-[#E8E8EF] transition-colors"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
 
-            <span className="text-[10px] font-mono uppercase text-[#FF5722] tracking-widest block mb-1">
-              // LIBERAÇÃO OFICIAL DE INGRESSOS
+            <span className="text-[9px] uppercase text-[#8A3CFF] tracking-widest block mb-1">
+              // DISPARO EM MASSA
             </span>
-            <h3 className="ascend-font text-3xl uppercase tracking-tight mb-2">
-              LIBERAR <span className="text-yellow-ascend">LOTE DA FILA</span>
+            <h3 className="font-persona text-2xl uppercase tracking-tight mb-2">
+              LIBERAR LOTE DE INGRESSOS
             </h3>
-            <p className="text-xs text-zinc-400 mb-6 font-sans">
-              Os e-mails serão disparados para os próximos participantes da fila que ainda não foram notificados.
+            <p className="text-xs text-[#5B5B66] mb-6">
+              Os e-mails serão disparados para os próximos participantes da fila por ordem cronológica.
             </p>
 
             {releaseFeedback && (
-              <div className="mb-4 p-3 bg-zinc-900 border border-zinc-700 text-xs font-mono">
+              <div className="mb-4 p-2.5 bg-[#0B0B0D] border border-[#1F1F24] text-xs">
                 {releaseFeedback}
               </div>
             )}
 
-            <form onSubmit={handleReleaseBatch} className="space-y-4 font-mono">
+            <form onSubmit={handleReleaseBatch} className="space-y-4 text-xs">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-                  Quantidade de Ingressos / Vagas a Liberar:
+                <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">
+                  Quantidade a Liberar:
                 </label>
                 <input
                   type="number"
@@ -761,16 +709,16 @@ export default function AdminPage() {
                   max="100"
                   value={batchCount}
                   onChange={(e) => setBatchCount(Number(e.target.value))}
-                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 text-lg font-bold outline-none"
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none"
                 />
-                <span className="text-[10px] text-zinc-500 mt-1 block">
-                  Participantes aguardando na fila: <strong>{waitingCount}</strong>
+                <span className="text-[9px] text-[#5B5B66] mt-1 block">
+                  Aguardando na fila: <strong>{waitingCount}</strong>
                 </span>
               </div>
 
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-                  Prazo de Expiração do Pagamento (Horas):
+                <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">
+                  Prazo de Expiração (Horas):
                 </label>
                 <input
                   type="number"
@@ -778,28 +726,21 @@ export default function AdminPage() {
                   max="72"
                   value={expirationHours}
                   onChange={(e) => setExpirationHours(Number(e.target.value))}
-                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 text-sm font-bold outline-none"
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none"
                 />
-              </div>
-
-              <div className="p-3 bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 font-sans space-y-1">
-                <strong className="text-white uppercase block text-[10px] font-mono">Efeito da Ação:</strong>
-                <p>&bull; Envia e-mail oficial com o link de pagamento PIX.</p>
-                <p>&bull; Marca o status de notificação como "Enviada" e grava o timestamp.</p>
-                <p>&bull; Se o Resend não estiver configurado, simula com log no console.</p>
               </div>
 
               <button
                 type="submit"
                 disabled={isReleasing || waitingCount === 0}
-                className="w-full bg-[#FF5722] hover:bg-orange-500 disabled:opacity-50 text-black font-black py-4 px-4 uppercase text-xs tracking-wider border-2 border-black flex items-center justify-center gap-2 transition-colors"
+                className="w-full bg-[#8A3CFF] hover:bg-[#9a54ff] disabled:opacity-50 text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors"
               >
                 {isReleasing ? (
-                  <span>Disparando E-mails...</span>
+                  <span>DISPARANDO E-MAILS...</span>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    <span>Confirmar Disparo de E-mails</span>
+                    <span>CONFIRMAR DISPARO</span>
                   </>
                 )}
               </button>
