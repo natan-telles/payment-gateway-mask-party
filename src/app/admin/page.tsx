@@ -15,6 +15,12 @@ import {
   ExternalLink,
   MessageSquare,
   ArrowLeft,
+  Mail,
+  Send,
+  AlertTriangle,
+  X,
+  Sparkles,
+  Check,
 } from 'lucide-react';
 import { WaitingQueueEntry } from '@/types/database';
 
@@ -36,6 +42,16 @@ export default function AdminPage() {
   const [notificationFilter, setNotificationFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
+
+  // Estados do Epic 3 (Comunicação e Liberação de Lote)
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+  const [batchCount, setBatchCount] = useState(10);
+  const [expirationHours, setExpirationHours] = useState(12);
+  const [isReleasing, setIsReleasing] = useState(false);
+  const [releaseFeedback, setReleaseFeedback] = useState<string | null>(null);
+
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
+  const [reminderFeedback, setReminderFeedback] = useState<string | null>(null);
 
   // Recupera senha salva na sessão
   useEffect(() => {
@@ -206,13 +222,13 @@ export default function AdminPage() {
     document.body.removeChild(link);
   };
 
-  // Enviar WhatsApp direto com template da Mask Party
+  // Enviar WhatsApp direto com template da Mask Party (Semi-automático)
   const handleNotifyWhatsApp = (lead: WaitingQueueEntry) => {
     const rawPhone = lead.phone.replace(/\D/g, '');
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
     const text = encodeURIComponent(
-      `Olá, ${lead.name.split(' ')[0]}! 🎭\n\nSua prioridade na fila da *MASK PARTY 2026* chegou! (Posição #${lead.queue_position}).\n\nSeu acesso exclusivo para compra de ingresso no 1º Lote está liberado. Complete seu pagamento via PIX para garantir sua vaga antes do tempo limite de expiração.\n\nAcesse o link de compra: ${window.location.origin}?pix=active`
+      `Olá, ${lead.name.split(' ')[0]}! 🎭\n\nSua prioridade na fila da *MASK PARTY 2026* chegou! (Posição #${lead.queue_position}).\n\nSeu acesso exclusivo para compra de ingresso no 1º Lote está liberado. Complete seu pagamento via PIX para garantir sua vaga antes do tempo limite de expiração.\n\nAcesse o link de compra: ${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`
     );
 
     const waUrl = `https://wa.me/${phoneWithDDI}?text=${text}`;
@@ -220,6 +236,69 @@ export default function AdminPage() {
 
     // Marca como notificado automaticamente
     updateStatus(lead.id, { notification_status: 'sent' });
+  };
+
+  // Liberação de Lote de Ingressos por E-mail (Epic 3)
+  const handleReleaseBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsReleasing(true);
+    setReleaseFeedback(null);
+
+    try {
+      const res = await fetch('/api/admin/notifications/release-batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': password,
+        },
+        body: JSON.stringify({ count: batchCount, expirationHours }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const mode = data.simulated ? ' (Modo Simulação)' : ' (Resend Real)';
+        setReleaseFeedback(`✅ Sucesso! ${data.releasedCount} participante(s) notificado(s) por e-mail na ordem da fila${mode}.`);
+        fetchLeads();
+      } else {
+        setReleaseFeedback(`❌ Erro: ${data.error || 'Falha ao liberar lote.'}`);
+      }
+    } catch {
+      setReleaseFeedback('❌ Erro na conexão ao disparar lote.');
+    } finally {
+      setIsReleasing(false);
+    }
+  };
+
+  // Disparo de Lembretes de Pagamento / Expiração (Epic 3)
+  const handleSendReminders = async () => {
+    if (!confirm('Deseja disparar e-mails de lembrete para todos os participantes que estão com pagamento pendente?')) return;
+
+    setIsSendingReminders(true);
+    setReminderFeedback(null);
+
+    try {
+      const res = await fetch('/api/admin/notifications/send-reminders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': password,
+        },
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setReminderFeedback(`📢 Lembretes enviados para ${data.remindedCount} participante(s) pendente(s).`);
+        setTimeout(() => setReminderFeedback(null), 5000);
+      } else {
+        alert(data.error || 'Erro ao enviar lembretes.');
+      }
+    } catch {
+      alert('Erro de conexão ao enviar lembretes.');
+    } finally {
+      setIsSendingReminders(false);
+    }
   };
 
   // TELA DE LOGIN DO ADMIN
@@ -278,6 +357,8 @@ export default function AdminPage() {
     );
   }
 
+  const waitingCount = metrics.total - metrics.notifiedCount;
+
   // TELA PRINCIPAL DO PAINEL ADMIN
   return (
     <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8 font-sans">
@@ -297,7 +378,7 @@ export default function AdminPage() {
             </span>
           </div>
           <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest block mt-1">
-            EPIC 2: GESTÃO DA FILA IMUTÁVEL & PREVENÇÃO DE DUPLICIDADE
+            EPIC 2 & 3: GESTÃO DA FILA IMUTÁVEL & SISTEMA DE NOTIFICAÇÕES (E-MAIL + WHATSAPP)
           </span>
         </div>
 
@@ -374,6 +455,53 @@ export default function AdminPage() {
             <span className="text-[10px] font-mono text-zinc-500 block mt-2">Aguardando PIX</span>
           </div>
         </div>
+
+        {/* CENTRO DE CONTROLE DE COMUNICAÇÃO & LIBERAÇÃO DE LOTES (EPIC 3) */}
+        <div className="bg-zinc-950 border-2 border-white/30 p-6 shadow-[6px_6px_0px_0px_#FF5722] flex flex-col md:flex-row items-center justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Mail className="w-4 h-4 text-[#FF5722]" />
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[#FF5722]">
+                // AUTOMAÇÃO DE NOTIFICAÇÕES & DISPARO
+              </span>
+            </div>
+            <h3 className="ascend-font text-2xl uppercase tracking-tight text-white">
+              LIBERAÇÃO DE <span className="text-yellow-ascend">LOTES DA FILA</span>
+            </h3>
+            <p className="text-xs text-zinc-400 font-sans max-w-xl mt-1">
+              Convoca os próximos inscritos por <strong>ordem cronológica imutável</strong>. Dispara e-mails oficiais com o botão de pagamento PIX e prazo de validade.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto font-mono">
+            <button
+              onClick={() => {
+                setReleaseFeedback(null);
+                setIsReleaseModalOpen(true);
+              }}
+              className="bg-[#FF5722] hover:bg-orange-500 text-black font-black py-3 px-5 uppercase text-xs tracking-wider flex items-center gap-2 border-2 border-black shadow-[2px_2px_0px_0px_#fff] transition-transform active:translate-y-0.5"
+            >
+              <Send className="w-4 h-4" />
+              <span>Liberar Próximo Lote</span>
+            </button>
+
+            <button
+              onClick={handleSendReminders}
+              disabled={isSendingReminders || metrics.pendingPaymentCount === 0}
+              className="bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white font-bold py-3 px-4 uppercase text-xs tracking-wider flex items-center gap-2 border border-zinc-700 transition-colors"
+              title="Disparar lembrete de expiração para quem ainda não pagou"
+            >
+              <Clock className="w-4 h-4 text-yellow-ascend" />
+              <span>Disparar Lembretes ({metrics.pendingPaymentCount})</span>
+            </button>
+          </div>
+        </div>
+
+        {reminderFeedback && (
+          <div className="p-3 bg-yellow-950/80 border border-yellow-500 text-yellow-200 text-xs font-mono font-bold">
+            {reminderFeedback}
+          </div>
+        )}
 
         {/* BARRA DE FILTROS & BUSCA */}
         <div className="bg-zinc-950 border-2 border-zinc-800 p-4 flex flex-col md:flex-row items-center gap-4">
@@ -558,10 +686,10 @@ export default function AdminPage() {
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => handleNotifyWhatsApp(lead)}
-                            className="p-1.5 bg-[#FF5722] hover:bg-orange-500 text-black font-bold"
-                            title="Disparar link de pagamento no WhatsApp"
+                            className="p-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold"
+                            title="Disparar link no WhatsApp (Semi-automático)"
                           >
-                            <ExternalLink className="w-3.5 h-3.5" />
+                            <MessageSquare className="w-3.5 h-3.5" />
                           </button>
 
                           <button
@@ -581,6 +709,91 @@ export default function AdminPage() {
           </table>
         </div>
       </div>
+
+      {/* MODAL DE LIBERAÇÃO DE LOTE POR E-MAIL */}
+      {isReleaseModalOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-950 text-white border-2 border-white w-full max-w-md p-6 relative shadow-[8px_8px_0px_0px_#FF5722]">
+            <button
+              onClick={() => setIsReleaseModalOpen(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <span className="text-[10px] font-mono uppercase text-[#FF5722] tracking-widest block mb-1">
+              // LIBERAÇÃO OFICIAL DE INGRESSOS
+            </span>
+            <h3 className="ascend-font text-3xl uppercase tracking-tight mb-2">
+              LIBERAR <span className="text-yellow-ascend">LOTE DA FILA</span>
+            </h3>
+            <p className="text-xs text-zinc-400 mb-6 font-sans">
+              Os e-mails serão disparados para os próximos participantes da fila que ainda não foram notificados.
+            </p>
+
+            {releaseFeedback && (
+              <div className="mb-4 p-3 bg-zinc-900 border border-zinc-700 text-xs font-mono">
+                {releaseFeedback}
+              </div>
+            )}
+
+            <form onSubmit={handleReleaseBatch} className="space-y-4 font-mono">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
+                  Quantidade de Ingressos / Vagas a Liberar:
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={batchCount}
+                  onChange={(e) => setBatchCount(Number(e.target.value))}
+                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 text-lg font-bold outline-none"
+                />
+                <span className="text-[10px] text-zinc-500 mt-1 block">
+                  Participantes aguardando na fila: <strong>{waitingCount}</strong>
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
+                  Prazo de Expiração do Pagamento (Horas):
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="72"
+                  value={expirationHours}
+                  onChange={(e) => setExpirationHours(Number(e.target.value))}
+                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 text-sm font-bold outline-none"
+                />
+              </div>
+
+              <div className="p-3 bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 font-sans space-y-1">
+                <strong className="text-white uppercase block text-[10px] font-mono">Efeito da Ação:</strong>
+                <p>&bull; Envia e-mail oficial com o link de pagamento PIX.</p>
+                <p>&bull; Marca o status de notificação como "Enviada" e grava o timestamp.</p>
+                <p>&bull; Se o Resend não estiver configurado, simula com log no console.</p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isReleasing || waitingCount === 0}
+                className="w-full bg-[#FF5722] hover:bg-orange-500 disabled:opacity-50 text-black font-black py-4 px-4 uppercase text-xs tracking-wider border-2 border-black flex items-center justify-center gap-2 transition-colors"
+              >
+                {isReleasing ? (
+                  <span>Disparando E-mails...</span>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Confirmar Disparo de E-mails</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
