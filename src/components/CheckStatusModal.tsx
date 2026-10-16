@@ -46,61 +46,61 @@ export function CheckStatusModal({ isOpen, onClose, onFound }: CheckStatusModalP
   };
 
   return (
-    <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-950 text-white border-2 border-white w-full max-w-md p-6 relative shadow-[8px_8px_0px_0px_#FF5722]">
+    <div className="fixed inset-0 bg-[#0B0B0D]/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+      <div className="bg-[#141418] text-[#E8E8EF] border border-[#1F1F24] w-full max-w-sm p-6 relative shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors"
+          className="absolute top-4 right-4 text-[#5B5B66] hover:text-[#E8E8EF] transition-colors"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </button>
 
-        <span className="text-[10px] font-mono uppercase text-[#FF5722] tracking-widest block mb-1">
-          // LOCALIZAR REGISTRO
+        <span className="font-data text-[9px] uppercase text-[#8A3CFF] tracking-widest block mb-1">
+          // PRÉ-VENDA BAILE DA LAGOA
         </span>
-        <h3 className="ascend-font text-2xl uppercase tracking-tight mb-2">
-          CONSULTAR <span className="text-yellow-ascend">POSIÇÃO NA FILA</span>
+        <h3 className="font-persona text-2xl uppercase tracking-tight mb-2">
+          CONSULTAR MEU LUGAR
         </h3>
-        <p className="text-xs text-zinc-400 mb-6">
-          Informe o WhatsApp ou e-mail cadastrado para verificar sua posição e comprovante.
+        <p className="text-xs text-[#5B5B66] font-data mb-6">
+          Informe o WhatsApp ou e-mail que você cadastrou.
         </p>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-950/80 border border-red-500 text-red-200 text-xs font-bold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
-            <span>{error}</span>
+          <div className="mb-4 p-2.5 bg-red-950/60 border border-[#FF2E3B]/50 text-[#FF2E3B] text-xs font-data">
+            {error}
           </div>
         )}
 
-        <form onSubmit={handleSearch} className="space-y-4">
+        <form onSubmit={handleSearch} className="space-y-4 font-data text-xs">
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-              WhatsApp ou E-mail cadastrado
+            <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">
+              WhatsApp ou E-mail
             </label>
             <input
               type="text"
               required
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="(11) 99999-9999 ou seu@email.com"
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 font-mono text-sm outline-none transition-colors"
+              placeholder="(12) 99999-9999 ou seu@email.com"
+              className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-data text-xs outline-none transition-colors"
+              autoFocus
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#FF5722] hover:bg-orange-500 text-black font-black py-3 px-4 uppercase text-xs tracking-wider flex items-center justify-center gap-2 border-2 border-black transition-colors"
+            className="w-full bg-[#8A3CFF] hover:bg-[#9a54ff] text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-black" />
-                <span>Buscando...</span>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>BUSCANDO...</span>
               </>
             ) : (
               <>
                 <Search className="w-4 h-4" />
-                <span>Buscar Posição</span>
+                <span>CONSULTAR BILHETE</span>
               </>
             )}
           </button>

@@ -1,96 +1,148 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #050505;
-  --text: #ffffff;
-  --accent: #FF5722;
-  --yellow: #F3FF33;
+  --bg-pista: #0B0B0D;
+  --uv: #8A3CFF;
+  --red-sinal: #FF2E3B;
+  --cromo: #E8E8EF;
+  --fumaca: #5B5B66;
+  --fumaca-dark: #1F1F24;
 }
 
 @theme inline {
-  --color-bg: var(--bg);
-  --color-text: var(--text);
-  --color-accent: var(--accent);
-  --color-yellow-ascend: var(--yellow);
+  --color-bg-pista: var(--bg-pista);
+  --color-uv: var(--uv);
+  --color-red-sinal: var(--red-sinal);
+  --color-cromo: var(--cromo);
+  --color-fumaca: var(--fumaca);
+  --color-fumaca-dark: var(--fumaca-dark);
   --font-anton: var(--font-anton);
-  --font-sans: var(--font-inter);
+  --font-space-mono: var(--font-space-mono);
+  --font-archivo: var(--font-archivo);
 }
 
 body {
-  background-color: var(--bg);
-  color: var(--text);
-  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-pista);
+  color: var(--cromo);
+  font-family: var(--font-archivo), -apple-system, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-.ascend-font,
-.font-display {
-  font-family: var(--font-anton), impact, sans-serif;
+/* Tipografia de Título Oficial Baile Persona */
+.font-persona {
+  font-family: var(--font-anton), sans-serif;
+  line-height: 0.9;
   letter-spacing: -0.02em;
+  text-transform: uppercase;
 }
 
-.text-accent {
-  color: var(--accent);
+/* Tipografia de Dados & Flyer Oficial */
+.font-data {
+  font-family: var(--font-space-mono), monospace;
+  letter-spacing: 0.1em;
 }
 
-.bg-accent {
-  background-color: var(--accent);
+/* Animações Suaves Jitter (The Stack style) */
+@keyframes stackFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.border-accent {
-  border-color: var(--accent);
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(138, 60, 255, 0.6);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 6px rgba(138, 60, 255, 0);
+  }
 }
 
-.bg-yellow-ascend {
-  background-color: var(--yellow);
-  color: #000000;
+.animate-stack-1 {
+  animation: stackFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.text-yellow-ascend {
-  color: var(--yellow);
+.animate-stack-2 {
+  animation: stackFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
 }
 
-/* Brutalist ticket borders & utility */
-.ticket-dashed {
-  border-style: dashed;
+.animate-stack-3 {
+  animation: stackFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both;
 }
 
-/* Custom scrollbar */
+.animate-stack-4 {
+  animation: stackFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
+}
+
+.pulse-livestream {
+  animation: pulseGlow 2.5s infinite;
+}
+
+/* Scanlines finas (regra oficial da marca: linha escura a cada 4px) */
+.scanlines-overlay {
+  background: linear-gradient(
+    rgba(11, 11, 13, 0) 50%,
+    rgba(0, 0, 0, 0.45) 50%
+  );
+  background-size: 100% 4px;
+}
+
+/* Bordas Cromo e Fumaça */
+.border-cromo {
+  border-color: var(--cromo);
+}
+
+.border-fumaca {
+  border-color: var(--fumaca);
+}
+
+.border-fumaca-dark {
+  border-color: var(--fumaca-dark);
+}
+
+/* Custom scrollbar ultra-fina */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f0f0f;
+  background: var(--bg-pista);
 }
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 4px;
+  background: var(--fumaca);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent);
+  background: var(--uv);
 }
 
-/* Regras de Impressão do Bilhete / Ticket Pass */
+/* Regras de Impressão */
 @media print {
   @page {
     margin: 1cm;
     size: auto;
   }
-  
   body {
     background: white !important;
     color: black !important;
   }
-
   .no-print {
     display: none !important;
   }
-
   .print-only-ticket {
     display: block !important;
     margin: 0 auto !important;
     max-width: 450px !important;
     box-shadow: none !important;
     border: 3px solid black !important;
+    color: black !important;
+    background: white !important;
   }
 }
