@@ -378,7 +378,7 @@ export default function AdminPage() {
             </span>
           </div>
           <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest block mt-1">
-            EPIC 2 & 3: GESTÃO DA FILA IMUTÁVEL & SISTEMA DE NOTIFICAÇÕES (E-MAIL + WHATSAPP)
+            EPIC 2, 3 & 4: GESTÃO DA FILA IMUTÁVEL, COMUNICAÇÃO & ANALYTICS
           </span>
         </div>
 
@@ -409,6 +409,19 @@ export default function AdminPage() {
           </button>
         </div>
       </header>
+
+      {/* Abas de Navegação do Admin */}
+      <div className="max-w-7xl mx-auto flex items-center gap-2 font-mono text-xs mb-8">
+        <div className="px-4 py-2 bg-[#FF5722] text-black font-black border-2 border-white/80 uppercase tracking-wider shadow-[2px_2px_0px_0px_#fff]">
+          📋 Gestão da Fila
+        </div>
+        <Link
+          href="/admin/analytics"
+          className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-700 uppercase tracking-wider transition-colors flex items-center gap-1.5"
+        >
+          <span>📊 Métricas & Analytics</span>
+        </Link>
+      </div>
 
       <div className="max-w-7xl mx-auto space-y-8">
         {/* CARDS DE MÉTRICAS */}
