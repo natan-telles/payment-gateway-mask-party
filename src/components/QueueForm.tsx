@@ -1,8 +1,8 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { QueueResponse } from '@/types/database';
-import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
 
 interface QueueFormProps {
   onSuccess: (data: NonNullable<QueueResponse['data']>) => void;
@@ -17,10 +17,10 @@ export function QueueForm({ onSuccess }: QueueFormProps) {
   const [instagram, setInstagram] = useState('');
   const [source, setSource] = useState('direct');
 
+  const [showOptional, setShowOptional] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Captura parâmetros de UTM ou origem da URL
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -29,7 +29,6 @@ export function QueueForm({ onSuccess }: QueueFormProps) {
     }
   }, []);
 
-  // Máscara brasileira de telefone (XX) XXXXX-XXXX
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
     if (value.length > 11) value = value.slice(0, 11);
@@ -50,12 +49,12 @@ export function QueueForm({ onSuccess }: QueueFormProps) {
 
     const cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length < 10) {
-      setErrorMessage('Por favor, informe um WhatsApp válido com DDD.');
+      setErrorMessage('Informe um WhatsApp válido com DDD.');
       return;
     }
 
     if (!email.includes('@') || !email.includes('.')) {
-      setErrorMessage('Por favor, informe um endereço de e-mail válido.');
+      setErrorMessage('Informe um e-mail válido.');
       return;
     }
 
@@ -66,12 +65,12 @@ export function QueueForm({ onSuccess }: QueueFormProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
+          name: name.trim(),
           phone: cleanPhone,
-          email,
+          email: email.trim(),
           age: age ? parseInt(age, 10) : null,
-          neighborhood,
-          instagram,
+          neighborhood: neighborhood.trim() || null,
+          instagram: instagram.trim() || null,
           source,
         }),
       });
@@ -80,79 +79,73 @@ export function QueueForm({ onSuccess }: QueueFormProps) {
       const payload = json.data || (json.id ? json : null);
 
       if (!res.ok || !json.success || !payload) {
-        throw new Error(json.error || 'Erro ao registrar na fila de espera.');
+        throw new Error(json.error || 'Erro ao garantir lugar na lista.');
       }
 
       onSuccess(payload);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Falha na conexão. Tente novamente.');
+      setErrorMessage(err.message || 'Falha de conexão. Tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto bg-black text-white border-2 border-white/20 p-6 md:p-8 shadow-[8px_8px_0px_0px_#FF5722] relative">
-      {/* Badge Topo */}
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-6">
-        <div>
-          <span className="text-[10px] uppercase font-mono tracking-widest text-[#FF5722] block">
-            // REGISTRO DE PRIORIDADE
+    <div className="w-full max-w-md mx-auto bg-[#141418] border border-[#1F1F24] hover:border-[#2A2A32] p-5 sm:p-6 shadow-2xl relative transition-all duration-300 animate-stack-2">
+      {/* Header do Card */}
+      <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1F1F24]">
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-[#8A3CFF] rounded-full" />
+          <span className="font-data text-[10px] uppercase text-[#8A3CFF] tracking-widest font-bold">
+            PRÉ-VENDA EXCLUSIVA
           </span>
-          <h2 className="ascend-font text-3xl uppercase tracking-tight text-white">
-            ENTRAR NA <span className="text-yellow-ascend">FILA DE ESPERA</span>
-          </h2>
         </div>
-        <div className="bg-[#FF5722] text-black font-black text-xs px-2.5 py-1 uppercase font-mono">
-          GRÁTIS
-        </div>
+        <span className="font-data text-[10px] uppercase bg-[#0B0B0D] text-[#E8E8EF] px-2 py-0.5 border border-[#1F1F24]">
+          1º LOTE
+        </span>
       </div>
 
       {errorMessage && (
-        <div className="mb-6 p-3 bg-red-950/80 border border-red-500 text-red-200 text-xs font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
-          <span>{errorMessage}</span>
+        <div className="mb-4 p-2.5 bg-red-950/60 border border-[#FF2E3B]/50 text-[#FF2E3B] text-xs font-data">
+          {errorMessage}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3 font-data text-xs">
         {/* Nome */}
         <div>
-          <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-            Nome Completo <span className="text-[#FF5722]">*</span>
+          <label className="block text-[10px] uppercase text-[#5B5B66] mb-1 font-bold">
+            Nome Completo
           </label>
           <input
             type="text"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="EX: NATAN SILVA"
-            className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 font-mono text-sm uppercase outline-none transition-colors"
+            placeholder="COMO QUER SER CHAMADO"
+            className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-3 py-2.5 font-data text-xs uppercase outline-none transition-all placeholder:text-[#5B5B66]"
           />
         </div>
 
-        {/* WhatsApp e E-mail em grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* WhatsApp & Email em grid compacto */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-              WhatsApp / Celular <span className="text-[#FF5722]">*</span>
+            <label className="block text-[10px] uppercase text-[#5B5B66] mb-1 font-bold">
+              WhatsApp
             </label>
             <input
               type="tel"
               required
               value={phone}
               onChange={handlePhoneChange}
-              placeholder="(11) 99999-9999"
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 font-mono text-sm outline-none transition-colors"
+              placeholder="(12) 99999-9999"
+              className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-3 py-2.5 font-data text-xs outline-none transition-all placeholder:text-[#5B5B66]"
             />
-            <span className="text-[9px] text-zinc-500 font-mono mt-1 block">
-              Canal de notificação do PIX
-            </span>
           </div>
 
           <div>
-            <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-              E-mail <span className="text-[#FF5722]">*</span>
+            <label className="block text-[10px] uppercase text-[#5B5B66] mb-1 font-bold">
+              E-mail
             </label>
             <input
               type="email"
@@ -160,80 +153,84 @@ export function QueueForm({ onSuccess }: QueueFormProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="seu@email.com"
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 font-mono text-sm lowercase outline-none transition-colors"
-            />
-            <span className="text-[9px] text-zinc-500 font-mono mt-1 block">
-              Backup e envio de ingressos
-            </span>
-          </div>
-        </div>
-
-        {/* Bairro, Idade e Instagram (Opcionais do Debrief) */}
-        <div className="grid grid-cols-3 gap-3 pt-2">
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-              Idade
-            </label>
-            <input
-              type="number"
-              min="12"
-              max="99"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              placeholder="24"
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 font-mono text-sm outline-none transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-              Bairro / Cidade
-            </label>
-            <input
-              type="text"
-              value={neighborhood}
-              onChange={(e) => setNeighborhood(e.target.value)}
-              placeholder="Pinheiros"
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 font-mono text-sm uppercase outline-none transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-              Instagram
-            </label>
-            <input
-              type="text"
-              value={instagram}
-              onChange={(e) => setInstagram(e.target.value)}
-              placeholder="@seuuser"
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-[#FF5722] text-white p-3 font-mono text-sm outline-none transition-colors"
+              className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-3 py-2.5 font-data text-xs outline-none transition-all placeholder:text-[#5B5B66]"
             />
           </div>
         </div>
 
-        {/* Termo e Submissão */}
-        <div className="pt-4">
+        {/* Accordion compacto para opcionais */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowOptional(!showOptional)}
+            className="text-[10px] text-[#5B5B66] hover:text-[#8A3CFF] flex items-center gap-1 py-1 transition-colors uppercase font-data"
+          >
+            <span>{showOptional ? '- Menos detalhes' : '+ Adicionar bairro / Instagram'}</span>
+            {showOptional ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+
+          {showOptional && (
+            <div className="grid grid-cols-3 gap-2 pt-2 animate-in fade-in duration-200">
+              <div>
+                <label className="block text-[9px] uppercase text-[#5B5B66] mb-1">Idade</label>
+                <input
+                  type="number"
+                  min="16"
+                  max="99"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  placeholder="20"
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-2 py-2 font-data text-xs outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] uppercase text-[#5B5B66] mb-1">Bairro</label>
+                <input
+                  type="text"
+                  value={neighborhood}
+                  onChange={(e) => setNeighborhood(e.target.value)}
+                  placeholder="Ex: Aquarius"
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-2 py-2 font-data text-xs outline-none uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[9px] uppercase text-[#5B5B66] mb-1">Instagram</label>
+                <input
+                  type="text"
+                  value={instagram}
+                  onChange={(e) => setInstagram(e.target.value)}
+                  placeholder="@user"
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-2 py-2 font-data text-xs outline-none"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* CTA VERMELHO SINAL */}
+        <div className="pt-2">
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#FF5722] hover:bg-orange-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black py-4 px-6 uppercase text-sm tracking-wider flex items-center justify-center gap-3 border-2 border-white/40 shadow-[4px_4px_0px_0px_#fff] transition-all active:translate-y-1"
+            className="w-full bg-[#FF2E3B] hover:bg-[#ff4753] active:scale-[0.99] disabled:opacity-50 text-white font-persona text-xl py-3.5 px-4 tracking-normal transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-[#FF2E3B]/20"
           >
             {loading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin text-black" />
-                <span>Registrando Posição...</span>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>RESERVANDO...</span>
               </>
             ) : (
               <>
-                <span>GARANTIR PRIORIDADE NA FILA</span>
-                <ArrowRight className="w-5 h-5" />
+                <span>GARANTIR MEU LUGAR NO 1º LOTE</span>
+                <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
 
-          <p className="text-[10px] text-zinc-500 text-center font-mono uppercase tracking-wider mt-3">
-            Posição calculada por ordem de timestamp. Cadastro 100% imutável.
+          <p className="font-data text-[9px] text-[#5B5B66] text-center uppercase tracking-widest mt-2">
+            Sem custo. Quem chega antes garante o 1º lote.
           </p>
         </div>
       </form>

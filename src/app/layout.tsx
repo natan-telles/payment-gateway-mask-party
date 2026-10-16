@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Anton, Inter } from "next/font/google";
+import { Anton, Space_Mono, Archivo } from "next/font/google";
 import "./globals.css";
 
 const anton = Anton({
@@ -9,15 +9,22 @@ const anton = Anton({
   display: "swap",
 });
 
-const inter = Inter({
+const spaceMono = Space_Mono({
+  weight: ["400", "700"],
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-space-mono",
+  display: "swap",
+});
+
+const archivo = Archivo({
+  subsets: ["latin"],
+  variable: "--font-archivo",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "MASK PARTY // LISTA DE ESPERA",
-  description: "Fila de espera oficial para a Mask Party. Garanta sua prioridade na liberação dos ingressos.",
+  title: "BAILE DA LAGOA // 31.10 · SJC",
+  description: "A noite das máscaras. Uma festa, uma regra: ninguém entra de cara limpa. Lista oficial de pré-venda do 1º lote.",
 };
 
 export default function RootLayout({
@@ -26,8 +33,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className={`${anton.variable} ${inter.variable} dark`}>
-      <body className="min-h-screen bg-[#050505] text-white font-sans selection:bg-[#FF5722] selection:text-black antialiased relative">
+    <html
+      lang="pt-BR"
+      className={`${anton.variable} ${spaceMono.variable} ${archivo.variable} dark`}
+    >
+      <body className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] selection:bg-[#8A3CFF] selection:text-white antialiased relative">
+        {/* Camada sutil de scanlines em toda a página (regra do Mídia Kit) */}
+        <div className="fixed inset-0 pointer-events-none z-50 scanlines-overlay opacity-30" />
         {children}
       </body>
     </html>

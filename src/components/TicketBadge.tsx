@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { CheckCircle2, Share2, Printer, ArrowRight, ShieldCheck, AlertCircle, Clock, Calendar, Check } from 'lucide-react';
+import { PersonaMaskIcon } from './PersonaMaskIcon';
+import { CheckCircle2, Share2, Printer, AlertCircle } from 'lucide-react';
 
 interface TicketBadgeProps {
   queuePosition: number;
@@ -26,12 +27,11 @@ export function TicketBadge({
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
-  // Formata o número da posição com zeros à esquerda
   const formattedPosition = String(queuePosition).padStart(4, '0');
 
   useEffect(() => {
     const payload = JSON.stringify({
-      event: 'MASK_PARTY_2026',
+      event: 'BAILE_DA_LAGOA_31.10',
       pos: queuePosition,
       phone,
       email,
@@ -39,11 +39,11 @@ export function TicketBadge({
     });
 
     QRCode.toDataURL(payload, {
-      width: 220,
+      width: 200,
       margin: 1,
       color: {
-        dark: '#000000',
-        light: '#ffffff',
+        dark: '#0B0B0D',
+        light: '#E8E8EF',
       },
     })
       .then(setQrDataUrl)
@@ -51,13 +51,13 @@ export function TicketBadge({
   }, [queuePosition, phone, email, createdAt]);
 
   const handleShare = () => {
-    const shareText = `Garanti meu lugar na fila oficial da Mask Party! Posição #${queuePosition}. Entre na fila você também:`;
+    const shareText = `Garanti meu lugar no Baile da Lagoa (31.10 · SJC)! Posição #${queuePosition}. Entre na lista:`;
     const shareUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
     if (navigator.share) {
       navigator
         .share({
-          title: 'Mask Party 2026 // Fila de Espera',
+          title: 'Baile da Lagoa // 31.10 · SJC',
           text: shareText,
           url: shareUrl,
         })
@@ -65,7 +65,7 @@ export function TicketBadge({
     } else {
       navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
       setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
+      setTimeout(() => setCopied(false), 2500);
     }
   };
 
@@ -76,140 +76,111 @@ export function TicketBadge({
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto animate-in fade-in zoom-in-95 duration-300">
-      {/* ALERTA DE SUCESSO (NO-PRINT) */}
+    <div className="w-full max-w-md mx-auto animate-stack-1">
+      {/* Alerta de Confirmação (no-print) */}
       <div
-        className={`no-print p-4 mb-4 border-2 font-bold uppercase text-xs flex items-center gap-3 ${
+        className={`no-print p-3 mb-3 border text-xs font-data flex items-center gap-2.5 ${
           alreadyRegistered
-            ? 'bg-yellow-ascend text-black border-black shadow-[4px_4px_0px_0px_#000]'
-            : 'bg-[#FF5722] text-black border-white shadow-[4px_4px_0px_0px_#fff]'
+            ? 'bg-[#141418] border-[#8A3CFF] text-[#E8E8EF]'
+            : 'bg-[#141418] border-[#FF2E3B] text-[#E8E8EF]'
         }`}
       >
         {alreadyRegistered ? (
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 text-[#8A3CFF] flex-shrink-0" />
         ) : (
-          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+          <CheckCircle2 className="w-4 h-4 text-[#FF2E3B] flex-shrink-0" />
         )}
-        <div className="leading-snug">
-          <strong>
-            {alreadyRegistered ? 'CADASTRO JÁ EXISTENTE!' : 'CADASTRO CONFIRMADO COM SUCESSO!'}
-          </strong>
-          <span className="block text-[11px] font-mono normal-case mt-0.5">
-            {alreadyRegistered
-              ? 'Localizamos o seu registro anterior no banco de dados. Sua posição foi mantida.'
-              : 'Sua prioridade na fila está salva. Guarde ou imprima o seu bilhete abaixo.'}
-          </span>
-        </div>
+        <span className="text-[11px] uppercase tracking-wider">
+          {alreadyRegistered
+            ? 'Lugar já reservado. Sua prioridade no lote está ativa.'
+            : 'Lugar garantido na pré-venda do 1º Lote.'}
+        </span>
       </div>
 
-      {/* BILHETE ESTILO CARAVANA ASCEND */}
-      <div className="print-only-ticket bg-white text-black border-4 border-black shadow-[8px_8px_0px_0px_#FF5722] relative overflow-hidden">
-        {/* Top Header do Ticket */}
-        <div className="bg-black text-white p-4 flex items-center justify-between border-b-2 border-black">
-          <div>
-            <span className="text-[10px] tracking-widest text-[#FF5722] font-mono uppercase block">
-              // OFFICIAL WAITING PASS
-            </span>
-            <h3 className="ascend-font text-3xl tracking-tight text-white uppercase leading-none mt-0.5">
-              MASK PARTY <span className="text-yellow-ascend">2026</span>
-            </h3>
+      {/* Cartão do Bilhete Baile da Lagoa */}
+      <div className="print-only-ticket bg-[#141418] border border-[#1F1F24] text-[#E8E8EF] relative overflow-hidden shadow-2xl">
+        {/* Header do Bilhete */}
+        <div className="bg-[#8A3CFF] p-4 text-[#0B0B0D] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <PersonaMaskIcon className="w-6 h-4" fillColor="#0B0B0D" />
+            <div>
+              <span className="font-persona text-2xl tracking-tight block leading-none">
+                BAILE DA LAGOA
+              </span>
+              <span className="font-data text-[9px] font-bold uppercase tracking-widest block mt-0.5">
+                31.10 · SJC
+              </span>
+            </div>
           </div>
-          <div className="text-right">
-            <span className="inline-block bg-[#FF5722] text-black text-[10px] font-black px-2 py-0.5 uppercase tracking-wider font-mono">
-              PRIORIDADE
-            </span>
-            <p className="text-[9px] text-zinc-400 font-mono mt-1">1º LOTE</p>
+          <span className="font-data text-[10px] bg-[#0B0B0D] text-[#E8E8EF] px-2 py-0.5 uppercase font-bold">
+            1º LOTE
+          </span>
+        </div>
+
+        {/* Posição Gigante */}
+        <div className="p-6 text-center border-b border-[#1F1F24] bg-[#0B0B0D]/60">
+          <span className="font-data text-[9px] uppercase tracking-widest text-[#5B5B66] block mb-1">
+            SEU NÚMERO NA PRÉ-VENDA
+          </span>
+          <div className="font-persona text-7xl text-[#E8E8EF] leading-none">
+            #{formattedPosition}
+          </div>
+          <span className="font-data text-[9px] uppercase tracking-widest text-[#8A3CFF] block mt-2">
+            PRIORIDADE GARANTIDA
+          </span>
+        </div>
+
+        {/* Dados do Participante */}
+        <div className="p-5 font-data text-xs space-y-2 border-b border-[#1F1F24]">
+          <div className="flex justify-between items-center">
+            <span className="text-[#5B5B66] text-[10px] uppercase">Nome:</span>
+            <strong className="text-[#E8E8EF] uppercase">{name}</strong>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[#5B5B66] text-[10px] uppercase">WhatsApp:</span>
+            <span className="text-[#E8E8EF]">{phone}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[#5B5B66] text-[10px] uppercase">E-mail:</span>
+            <span className="text-[#E8E8EF] text-[11px] truncate max-w-[200px]">{email}</span>
           </div>
         </div>
 
-        {/* Informações Centrais */}
-        <div className="p-6">
-          {/* Posição na Fila em Destaque Absoluto */}
-          <div className="bg-zinc-100 border-2 border-black p-4 text-center my-2 relative">
-            <span className="text-[10px] uppercase font-black tracking-widest text-zinc-500 block mb-1">
-              SUA POSIÇÃO IMUTÁVEL NA FILA
-            </span>
-            <div className="ascend-font text-6xl sm:text-7xl text-[#FF5722] leading-none tracking-tighter">
-              #{formattedPosition}
-            </div>
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <span className="text-[10px] uppercase bg-black text-white font-mono px-2 py-0.5 font-bold">
-                ORDEM CRONOLÓGICA
-              </span>
-              <span className="text-[10px] uppercase bg-yellow-ascend text-black font-mono px-2 py-0.5 font-bold">
-                STATUS: ATIVO
-              </span>
-            </div>
+        {/* QR Code Container */}
+        <div className="p-5 text-center bg-[#0B0B0D]">
+          <div className="inline-block p-2 bg-[#E8E8EF] border border-[#1F1F24]">
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt="QR Code da Fila" className="w-36 h-36 mx-auto" />
+            ) : (
+              <div className="w-36 h-36 bg-zinc-800 animate-pulse" />
+            )}
           </div>
-
-          {/* Dados do Participante */}
-          <div className="border-y-2 border-dashed border-black py-4 my-4 space-y-2 text-xs font-mono">
-            <div className="flex justify-between items-center">
-              <span className="font-bold uppercase text-zinc-500 font-sans">Participante:</span>
-              <strong className="uppercase font-mono text-sm">{name}</strong>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-bold uppercase text-zinc-500 font-sans">WhatsApp:</span>
-              <span className="font-mono">{phone}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-bold uppercase text-zinc-500 font-sans">E-mail:</span>
-              <span className="font-mono text-[11px] truncate max-w-[210px]">{email}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-bold uppercase text-zinc-500 font-sans">Registro:</span>
-              <span className="font-mono text-[11px]">
-                {new Date(createdAt).toLocaleString('pt-BR')}
-              </span>
-            </div>
-          </div>
-
-          {/* QR Code Container */}
-          <div className="text-center my-4">
-            <div className="inline-block p-2 border-2 border-black bg-white shadow-[4px_4px_0px_0px_#000]">
-              {qrDataUrl ? (
-                <img src={qrDataUrl} alt="QR Code da Fila" className="w-44 h-44 mx-auto" />
-              ) : (
-                <div className="w-44 h-44 bg-zinc-200 animate-pulse flex items-center justify-center text-xs font-mono">
-                  Gerando QR...
-                </div>
-              )}
-            </div>
-            <p className="text-[10px] font-bold text-zinc-600 uppercase mt-2 font-mono">
-              QR Code Oficial de Validação do Bilhete
-            </p>
-          </div>
-
-          {/* Próximos Passos */}
-          <div className="bg-[#050505] text-white p-3.5 border border-black text-xs space-y-1.5">
-            <div className="flex items-center gap-1.5 text-yellow-ascend font-black uppercase text-[11px]">
-              <ShieldCheck className="w-4 h-4" />
-              <span>O que acontece agora?</span>
-            </div>
-            <ul className="text-zinc-300 text-[11px] space-y-1 list-disc list-inside leading-snug">
-              <li>Na abertura do 1º lote, você receberá a notificação com link PIX no WhatsApp.</li>
-              <li>O link possui prazo de expiração: efetue o pagamento para garantir o ingresso.</li>
-              <li>Após aprovação, você recebe seu ingresso oficial com Dress Code e endereço secreto.</li>
-            </ul>
-          </div>
+          <p className="font-data text-[9px] text-[#5B5B66] uppercase tracking-widest mt-2">
+            Código de identificação da pré-venda
+          </p>
         </div>
 
-        {/* Rodapé com Ações (no-print) */}
-        <div className="no-print p-4 bg-zinc-100 border-t-2 border-black space-y-2">
+        {/* Regra Curta */}
+        <div className="p-4 bg-[#141418] border-t border-[#1F1F24] text-[11px] text-[#5B5B66] font-data text-center">
+          SEM MÁSCARA, SEM ENTRADA. AVISO DE LIBERAÇÃO DIRETO NO SEU WHATSAPP.
+        </div>
+
+        {/* Ações (no-print) */}
+        <div className="no-print p-4 bg-[#0B0B0D] border-t border-[#1F1F24] space-y-2 font-data">
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handlePrint}
-              className="w-full bg-black hover:bg-zinc-800 text-white font-black py-3 px-3 uppercase text-xs tracking-wider flex items-center justify-center gap-2 border-2 border-black transition-colors"
+              className="w-full bg-[#1F1F24] hover:bg-[#2b2b32] text-[#E8E8EF] py-2.5 px-3 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors"
             >
-              <Printer className="w-4 h-4 text-yellow-ascend" />
-              <span>Imprimir / PDF</span>
+              <Printer className="w-3.5 h-3.5 text-[#8A3CFF]" />
+              <span>Salvar Bilhete</span>
             </button>
 
             <button
               onClick={handleShare}
-              className="w-full bg-[#FF5722] hover:bg-orange-600 text-black font-black py-3 px-3 uppercase text-xs tracking-wider flex items-center justify-center gap-2 border-2 border-black transition-colors shadow-[2px_2px_0px_0px_#000]"
+              className="w-full bg-[#8A3CFF] hover:bg-[#9a54ff] text-[#0B0B0D] font-bold py-2.5 px-3 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors"
             >
-              <Share2 className="w-4 h-4" />
+              <Share2 className="w-3.5 h-3.5" />
               <span>{copied ? 'Copiado!' : 'Compartilhar'}</span>
             </button>
           </div>
@@ -217,9 +188,9 @@ export function TicketBadge({
           {onReset && (
             <button
               onClick={onReset}
-              className="w-full bg-white hover:bg-zinc-200 text-black border border-black font-bold py-2.5 px-4 uppercase text-[11px] tracking-wider transition-colors"
+              className="w-full text-center text-[10px] text-[#5B5B66] hover:text-[#E8E8EF] py-1 transition-colors uppercase"
             >
-              Novo cadastro ou consulta
+              Consultar outro registro
             </button>
           )}
         </div>

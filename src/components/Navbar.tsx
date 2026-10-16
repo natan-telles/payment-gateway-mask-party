@@ -1,47 +1,46 @@
 'use client';
 
 import React from 'react';
-import { Search, QrCode } from 'lucide-react';
+import { PersonaMaskIcon } from './PersonaMaskIcon';
+import { Search } from 'lucide-react';
 
 interface NavbarProps {
   onOpenCheckStatus: () => void;
-  onOpenCampaignQr: () => void;
+  onOpenInfo?: () => void;
 }
 
-export function Navbar({ onOpenCheckStatus, onOpenCampaignQr }: NavbarProps) {
+export function Navbar({ onOpenCheckStatus, onOpenInfo }: NavbarProps) {
   return (
-    <header className="no-print w-full border-b-2 border-white/10 bg-black/85 backdrop-blur-md sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-3.5 h-3.5 bg-[#FF5722] rotate-45 shadow-[0_0_10px_#FF5722]"></div>
+    <header className="no-print w-full border-b border-[#1F1F24] bg-[#0B0B0D]/90 backdrop-blur-md sticky top-0 z-40">
+      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+        {/* Brand & Símbolo */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-[#8A3CFF] flex items-center justify-center p-1.5 flex-shrink-0 transition-transform hover:scale-105 duration-200">
+            <PersonaMaskIcon className="w-full h-full" fillColor="#0B0B0D" />
+          </div>
           <div>
-            <span className="ascend-font text-2xl md:text-3xl tracking-tighter text-white uppercase block leading-none">
-              MASK <span className="text-[#FF5722]">PARTY</span>
+            <span className="font-persona text-xl tracking-tight text-[#E8E8EF] block leading-none">
+              BAILE DA LAGOA
             </span>
-            <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest block">
-              WAITING QUEUE // PRE-ORDER
+            <span className="font-data text-[9px] text-[#5B5B66] uppercase tracking-widest block mt-0.5">
+              31.10 · SJC
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            onClick={onOpenCampaignQr}
-            className="flex items-center gap-1.5 bg-zinc-950 hover:bg-zinc-900 text-zinc-300 border border-zinc-700 hover:border-yellow-ascend px-3 py-1.5 text-xs font-mono uppercase transition-colors"
-            title="Gerar QR Code de Campanha para Cartazes e Redes"
-          >
-            <QrCode className="w-3.5 h-3.5 text-yellow-ascend" />
-            <span className="hidden sm:inline">QR de Divulgação</span>
-            <span className="sm:hidden">QR</span>
-          </button>
+        {/* Live indicator & Ações */}
+        <div className="flex items-center gap-3 font-data text-xs">
+          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 bg-[#141418] border border-[#1F1F24] text-[9px] text-[#E8E8EF] uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#8A3CFF] pulse-livestream" />
+            <span>PRÉ-VENDA ATIVA</span>
+          </div>
 
           <button
             onClick={onOpenCheckStatus}
-            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 hover:border-[#FF5722] px-3 py-1.5 text-xs font-mono uppercase transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#1F1F24] hover:border-[#8A3CFF] bg-[#141418] hover:bg-[#1A1A20] text-[#E8E8EF] text-[10px] uppercase transition-all duration-200"
           >
-            <Search className="w-3.5 h-3.5 text-[#FF5722]" />
-            <span className="hidden sm:inline">Consultar Posição</span>
-            <span className="sm:hidden">Consultar</span>
+            <Search className="w-3 h-3 text-[#8A3CFF]" />
+            <span>Consultar Lugar</span>
           </button>
         </div>
       </div>
