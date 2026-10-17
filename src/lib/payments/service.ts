@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAppUrl } from '@/lib/app-url';
 import { sendTicketEmail } from '@/lib/notifications/email';
 import { getPaymentProvider } from '.';
 import { PaymentProvider, PaymentReference } from './types';
@@ -9,12 +10,8 @@ export function isUuid(value: string) {
   return UUID_REGEX.test(value);
 }
 
-export function getAppUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-}
-
-export function getWebhookUrl(providerName: string) {
-  const url = new URL(`${getAppUrl()}/api/webhooks/${providerName}`);
+export function getWebhookUrl(providerName: string, requestOrigin?: string) {
+  const url = new URL(`${getAppUrl(requestOrigin)}/api/webhooks/${providerName}`);
   const token = process.env.PAYMENT_WEBHOOK_TOKEN;
   if (token) url.searchParams.set('token', token);
   return url.toString();

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPaymentProvider, isSupabaseConfigured } from '@/lib/payments';
-import { getAppUrl, getWebhookUrl, isUuid } from '@/lib/payments/service';
+import { getWebhookUrl, isUuid } from '@/lib/payments/service';
+import { getAppUrl } from '@/lib/app-url';
 
 const RESERVATION_MINUTES = 30;
 
@@ -199,8 +200,8 @@ export async function POST(req: NextRequest) {
         description: `Ingresso Baile da Lagoa · ${reservation.lot_name}`,
         expiresInMinutes: RESERVATION_MINUTES,
         customer: { name: lead!.name, email: lead!.email, phone: lead!.phone },
-        redirectUrl: `${getAppUrl()}/pagamento/retorno`,
-        webhookUrl: getWebhookUrl(provider.name),
+        redirectUrl: `${getAppUrl(req.nextUrl.origin)}/pagamento/retorno`,
+        webhookUrl: getWebhookUrl(provider.name, req.nextUrl.origin),
       });
 
       await supabase
