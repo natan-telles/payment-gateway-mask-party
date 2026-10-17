@@ -50,6 +50,7 @@ export interface PaymentOrder {
   reserved_until: string;
   provider: string;
   checkout_url: string | null;
+  pix_code: string | null;
   provider_ref: string | null;
   transaction_id: string | null;
   paid_amount_cents: number | null;

@@ -67,6 +67,7 @@ function buildReference(fields: {
 
 export const infinitePayProvider: PaymentProvider = {
   name: 'infinitepay',
+  retryWebhookWhenNotPaid: true,
 
   async createCheckout({ orderId, amountCents, description, customer, redirectUrl, webhookUrl }) {
     const data = await post('/links', {
@@ -87,7 +88,7 @@ export const infinitePayProvider: PaymentProvider = {
       throw new Error(`InfinitePay não retornou o link de pagamento: ${JSON.stringify(data).slice(0, 300)}`);
     }
 
-    return { checkoutUrl, providerRef: asString(data?.slug) };
+    return { checkoutUrl, pixCode: null, providerRef: asString(data?.slug) };
   },
 
   async verifyPayment(ref) {
@@ -100,13 +101,15 @@ export const infinitePayProvider: PaymentProvider = {
 
     return {
       paid: data?.success === true && data?.paid === true,
+      // payment_check só confirma quando order_nsu, transaction_nsu e slug batem
+      orderId: ref.orderId,
       amountCents: Number(data?.amount) || 0,
       paidAmountCents: Number(data?.paid_amount) || 0,
       captureMethod: asString(data?.capture_method),
     };
   },
 
-  parseWebhook(body) {
+  parseWebhook({ body }) {
     if (!body || typeof body !== 'object') return null;
     const payload = body as Record<string, unknown>;
     return buildReference({

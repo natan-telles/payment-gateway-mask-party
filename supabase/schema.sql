@@ -180,6 +180,9 @@ CREATE TABLE IF NOT EXISTS public.payment_orders (
     paid_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Pix copia-e-cola (gateways com Pix direto no site, ex: Mercado Pago)
+ALTER TABLE public.payment_orders ADD COLUMN IF NOT EXISTS pix_code TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_payment_orders_lot_status ON public.payment_orders (lot_id, status);
 CREATE INDEX IF NOT EXISTS idx_payment_orders_lead ON public.payment_orders (lead_id);
 -- Um lead só pode ter um pedido pago
@@ -257,7 +260,7 @@ BEGIN
     WHERE status = 'reserved' AND reserved_until <= now();
 
     -- Reaproveita a reserva válida do lead, se houver
-    SELECT o.id, o.amount_cents, o.reserved_until, o.checkout_url, l.name AS lot_name
+    SELECT o.id, o.amount_cents, o.reserved_until, o.checkout_url, o.pix_code, o.provider_ref, l.name AS lot_name
     INTO v_order
     FROM public.payment_orders o
     JOIN public.ticket_lots l ON l.id = o.lot_id
@@ -272,7 +275,9 @@ BEGIN
             'lot_name', v_order.lot_name,
             'amount_cents', v_order.amount_cents,
             'reserved_until', v_order.reserved_until,
-            'checkout_url', v_order.checkout_url
+            'checkout_url', v_order.checkout_url,
+            'pix_code', v_order.pix_code,
+            'provider_ref', v_order.provider_ref
         );
     END IF;
 
@@ -293,7 +298,9 @@ BEGIN
         'lot_name', v_lot.name,
         'amount_cents', v_order.amount_cents,
         'reserved_until', v_order.reserved_until,
-        'checkout_url', null
+        'checkout_url', null,
+        'pix_code', null,
+        'provider_ref', null
     );
 END;
 $$;

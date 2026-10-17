@@ -45,34 +45,34 @@ export async function confirmOrderPayment(
   ref: PaymentReference,
   provider: PaymentProvider = getPaymentProvider()
 ): Promise<ConfirmResult> {
-  if (!isUuid(ref.orderId)) return { status: 'not_found' };
+  if (ref.orderId && !isUuid(ref.orderId)) return { status: 'not_found' };
 
   const supabase = createAdminClient();
 
-  const { data: order, error: orderError } = await supabase
-    .from('payment_orders')
-    .select('id, lead_id, amount_cents, status')
-    .eq('id', ref.orderId)
-    .maybeSingle();
-
-  if (orderError) throw new Error(orderError.message);
-  if (!order) return { status: 'not_found' };
-
-  if (order.status === 'paid' || order.status === 'duplicate') {
-    const { data: lead } = await supabase
-      .from('waiting_queue')
-      .select('ticket_code')
-      .eq('id', order.lead_id)
-      .maybeSingle();
-
-    return {
-      status: order.status === 'paid' ? 'already_confirmed' : 'duplicate',
-      ticketCode: lead?.ticket_code ?? null,
-    };
+  // Atalho para notificações repetidas: evita consultar o gateway de novo
+  if (ref.orderId) {
+    const already = await getSettledOrder(ref.orderId);
+    if (already) return already;
   }
 
   const verified = await provider.verifyPayment(ref);
   if (!verified.paid) return { status: 'not_paid' };
+
+  // O pedido vem da resposta do gateway; se a referência também trouxe um, precisam bater
+  const orderId = verified.orderId;
+  if (!orderId || !isUuid(orderId) || (ref.orderId && ref.orderId !== orderId)) {
+    console.error(`[PAGAMENTO] Pagamento ${ref.transactionId} sem pedido correspondente (${orderId}).`);
+    return { status: 'not_found' };
+  }
+
+  const { data: order, error: orderError } = await supabase
+    .from('payment_orders')
+    .select('id, amount_cents')
+    .eq('id', orderId)
+    .maybeSingle();
+
+  if (orderError) throw new Error(orderError.message);
+  if (!order) return { status: 'not_found' };
 
   if (verified.amountCents < order.amount_cents) {
     console.error(
@@ -122,6 +122,31 @@ export async function confirmOrderPayment(
       lotName: result.lot_name,
       receiptUrl: result.receipt_url,
     },
+  };
+}
+
+async function getSettledOrder(orderId: string): Promise<ConfirmResult | null> {
+  const supabase = createAdminClient();
+
+  const { data: order, error } = await supabase
+    .from('payment_orders')
+    .select('lead_id, status')
+    .eq('id', orderId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!order) return { status: 'not_found' };
+  if (order.status !== 'paid' && order.status !== 'duplicate') return null;
+
+  const { data: lead } = await supabase
+    .from('waiting_queue')
+    .select('ticket_code')
+    .eq('id', order.lead_id)
+    .maybeSingle();
+
+  return {
+    status: order.status === 'paid' ? 'already_confirmed' : 'duplicate',
+    ticketCode: lead?.ticket_code ?? null,
   };
 }
 

@@ -14,6 +14,13 @@ interface ReserveResult {
   amount_cents: number;
   reserved_until: string;
   checkout_url: string | null;
+  pix_code: string | null;
+  provider_ref: string | null;
+}
+
+// Pix direto no site: dados para exibir o QR e acompanhar o pagamento
+function pixPayload(orderId: string, pixCode: string, paymentId: string | null, reservedUntil: string) {
+  return { orderId, code: pixCode, paymentId, expiresAt: reservedUntil };
 }
 
 const RESERVE_ERRORS: Record<string, { status: number; message: string }> = {
@@ -74,7 +81,7 @@ export async function GET(req: NextRequest) {
     // Reserva válida do lead tem prioridade sobre o lote vigente
     const { data: reservation } = await supabase
       .from('payment_orders')
-      .select('amount_cents, reserved_until, ticket_lots(name)')
+      .select('id, amount_cents, reserved_until, pix_code, provider_ref, ticket_lots(name)')
       .eq('lead_id', leadId)
       .eq('status', 'reserved')
       .gt('reserved_until', new Date().toISOString())
@@ -89,6 +96,9 @@ export async function GET(req: NextRequest) {
           status: 'available',
           lot: { name: lot?.name ?? '', priceCents: reservation.amount_cents },
           reservedUntil: reservation.reserved_until,
+          pix: reservation.pix_code
+            ? pixPayload(reservation.id, reservation.pix_code, reservation.provider_ref, reservation.reserved_until)
+            : null,
         },
       });
     }
@@ -118,7 +128,8 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Reserva uma vaga no lote vigente por 30 min e gera o link de pagamento no gateway
+// Reserva uma vaga no lote vigente por 30 min e gera o pagamento no gateway
+// (link de checkout hospedado ou Pix para exibir no site)
 export async function POST(req: NextRequest) {
   try {
     const { leadId } = (await req.json()) as { leadId?: string };
@@ -158,6 +169,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, data: { checkoutUrl: reservation.checkout_url } });
     }
 
+    if (reservation.pix_code) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          pix: pixPayload(reservation.order_id, reservation.pix_code, reservation.provider_ref, reservation.reserved_until),
+        },
+      });
+    }
+
     if (reservation.reused) {
       // Outra requisição do mesmo lead ainda está gerando o link
       return NextResponse.json(
@@ -177,6 +197,7 @@ export async function POST(req: NextRequest) {
         orderId: reservation.order_id,
         amountCents: reservation.amount_cents,
         description: `Ingresso Baile da Lagoa · ${reservation.lot_name}`,
+        expiresInMinutes: RESERVATION_MINUTES,
         customer: { name: lead!.name, email: lead!.email, phone: lead!.phone },
         redirectUrl: `${getAppUrl()}/pagamento/retorno`,
         webhookUrl: getWebhookUrl(provider.name),
@@ -184,8 +205,17 @@ export async function POST(req: NextRequest) {
 
       await supabase
         .from('payment_orders')
-        .update({ checkout_url: checkout.checkoutUrl, provider_ref: checkout.providerRef })
+        .update({ checkout_url: checkout.checkoutUrl, pix_code: checkout.pixCode, provider_ref: checkout.providerRef })
         .eq('id', reservation.order_id);
+
+      if (checkout.pixCode) {
+        return NextResponse.json({
+          success: true,
+          data: {
+            pix: pixPayload(reservation.order_id, checkout.pixCode, checkout.providerRef, reservation.reserved_until),
+          },
+        });
+      }
 
       return NextResponse.json({ success: true, data: { checkoutUrl: checkout.checkoutUrl } });
     } catch (err) {

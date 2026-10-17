@@ -1,8 +1,10 @@
 import { infinitePayProvider } from './infinitepay';
+import { mercadoPagoProvider } from './mercadopago';
 import { PaymentProvider } from './types';
 
 const providers: Record<string, PaymentProvider> = {
   infinitepay: infinitePayProvider,
+  mercadopago: mercadoPagoProvider,
 };
 
 export function getPaymentProvider(name = process.env.PAYMENT_PROVIDER || 'infinitepay') {
@@ -21,4 +23,4 @@ export function isSupabaseConfigured() {
   );
 }
 
-export type { PaymentProvider, PaymentReference } from './types';
+export type { PaymentProvider, PaymentReference, WebhookRequest } from './types';

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { formatPrice } from '@/lib/payments/format';
+import { PixPayment, PixData } from './PixPayment';
 
 type CheckoutStatus = 'available' | 'paid' | 'not_released' | 'deadline_passed' | 'sold_out';
 
@@ -15,6 +16,7 @@ interface CheckoutSummary {
   ticketCode?: string | null;
   lot?: { name: string; priceCents: number };
   reservedUntil?: string;
+  pix?: PixData | null;
 }
 
 const BLOCKED_MESSAGES: Record<Exclude<CheckoutStatus, 'available' | 'paid'>, string> = {
@@ -31,6 +33,7 @@ export function CheckoutPanel({ leadId }: { leadId: string }) {
   const [summary, setSummary] = useState<CheckoutSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [pix, setPix] = useState<PixData | null>(null);
 
   useEffect(() => {
     fetch(`/api/checkout?lead=${encodeURIComponent(leadId)}`)
@@ -38,6 +41,7 @@ export function CheckoutPanel({ leadId }: { leadId: string }) {
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error(json.error || 'Erro ao carregar o checkout.');
         setSummary(json.data);
+        setPix(json.data.pix ?? null);
       })
       .catch((err) => setError(err.message));
   }, [leadId]);
@@ -56,6 +60,12 @@ export function CheckoutPanel({ leadId }: { leadId: string }) {
 
       if (!res.ok || !json.success) {
         throw new Error(json.error || 'Não foi possível gerar o pagamento.');
+      }
+
+      if (json.data.pix) {
+        setPix(json.data.pix);
+        setPaying(false);
+        return;
       }
 
       window.location.href = json.data.checkoutUrl;
@@ -114,30 +124,42 @@ export function CheckoutPanel({ leadId }: { leadId: string }) {
             </div>
           </div>
 
-          <p className="font-data text-[10px] text-[#5B5B66] uppercase leading-relaxed mb-4">
-            {summary.reservedUntil
-              ? `Vaga reservada até ${formatDateTime(summary.reservedUntil)}.`
-              : 'Ao continuar, sua vaga fica reservada por 30 minutos.'}
-            {summary.paymentDeadline && ` Prazo final: ${formatDateTime(summary.paymentDeadline)}.`}
-          </p>
+          {pix ? (
+            <PixPayment
+              pix={pix}
+              onExpired={() => {
+                setPix(null);
+                setSummary((current) => current && { ...current, reservedUntil: undefined, pix: null });
+              }}
+            />
+          ) : (
+            <>
+              <p className="font-data text-[10px] text-[#5B5B66] uppercase leading-relaxed mb-4">
+                {summary.reservedUntil
+                  ? `Vaga reservada até ${formatDateTime(summary.reservedUntil)}.`
+                  : 'Ao continuar, sua vaga fica reservada por 30 minutos.'}
+                {summary.paymentDeadline && ` Prazo final: ${formatDateTime(summary.paymentDeadline)}.`}
+              </p>
 
-          <button
-            onClick={handlePay}
-            disabled={paying}
-            className="w-full bg-[#FF2E3B] hover:bg-[#ff4b56] text-white font-persona text-lg py-3 px-4 uppercase flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
-          >
-            {paying ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>GERANDO PAGAMENTO...</span>
-              </>
-            ) : (
-              <>
-                <span>PAGAR VIA PIX</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
+              <button
+                onClick={handlePay}
+                disabled={paying}
+                className="w-full bg-[#FF2E3B] hover:bg-[#ff4b56] text-white font-persona text-lg py-3 px-4 uppercase flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+              >
+                {paying ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>GERANDO PAGAMENTO...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>PAGAR VIA PIX</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </>
+          )}
         </>
       )}
 
