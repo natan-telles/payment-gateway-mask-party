@@ -527,20 +527,22 @@ export async function sendTicketEmail({ to, name, ticketCode, lotName, receiptUr
 
   if (resend) {
     try {
-      const response = await resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: emailFrom,
         to,
         subject,
         html,
       });
 
-      if (response.error) {
-        return { success: false, error: response.error.message, simulated: false };
+      if (error) {
+        console.error(`[Resend Error] Falha ao enviar ingresso para ${to}:`, error);
+        return { success: false, error: error.message, simulated: false };
       }
 
-      return { success: true, id: response.data?.id, simulated: false };
+      console.log(`[Resend Success] Ingresso enviado para ${to} (ID: ${data?.id})`);
+      return { success: true, id: data?.id, simulated: false };
     } catch (err: any) {
-      console.error(`Erro ao enviar ingresso para ${to}:`, err);
+      console.error(`[Resend Exception] Falha ao enviar ingresso para ${to}:`, err);
       return { success: false, error: err.message, simulated: false };
     }
   }
