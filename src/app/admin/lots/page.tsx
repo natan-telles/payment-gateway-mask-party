@@ -329,7 +329,7 @@ export default function LotsPage() {
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="1º LOTE"
+                  placeholder="Uso interno (no site aparece Nº LOTE pela ordem)"
                   className={inputClass}
                 />
               </div>

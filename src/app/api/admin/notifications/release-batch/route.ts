@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAppUrl } from '@/lib/app-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendQueueReleaseEmail } from '@/lib/notifications/email';
+import { getCurrentLotLabels } from '@/lib/lots/server';
+import { DEFAULT_LOT } from '@/lib/lots/labels';
 
 function checkAdminAuth(req: NextRequest) {
   const authHeader = req.headers.get('x-admin-password');
@@ -53,6 +55,8 @@ export async function POST(req: NextRequest) {
     }
 
     const appUrl = getAppUrl(req.nextUrl.origin);
+    // Liberados ainda não têm reserva: o lote deles é o vigente (o checkout reserva nele)
+    const lot = await getCurrentLotLabels().catch(() => DEFAULT_LOT);
     const results = [];
     const idsToUpdate: string[] = [];
 
@@ -64,6 +68,7 @@ export async function POST(req: NextRequest) {
         name: lead.name,
         queuePosition: lead.queue_position,
         paymentUrl,
+        lotName: lot.name,
         expirationHours,
       });
 

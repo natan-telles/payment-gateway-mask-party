@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAppUrl } from '@/lib/app-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendReminderEmail } from '@/lib/notifications/email';
+import { getLeadsLotLabels } from '@/lib/lots/server';
+import { DEFAULT_LOT } from '@/lib/lots/labels';
 
 function checkAdminAuth(req: NextRequest) {
   const authHeader = req.headers.get('x-admin-password');
@@ -46,6 +48,8 @@ export async function POST(req: NextRequest) {
     }
 
     const appUrl = getAppUrl(req.nextUrl.origin);
+    // Cada lembrete cita o lote da própria pessoa (reserva válida ou, sem reserva, o vigente)
+    const lots = await getLeadsLotLabels(leads.map((lead) => lead.id)).catch(() => new Map());
     let remindedCount = 0;
 
     for (const lead of leads) {
@@ -55,6 +59,7 @@ export async function POST(req: NextRequest) {
         name: lead.name,
         queuePosition: lead.queue_position,
         paymentUrl,
+        lotName: (lots.get(lead.id) ?? DEFAULT_LOT).name,
       });
 
       if (res.success) {

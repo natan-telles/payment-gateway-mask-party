@@ -11,7 +11,8 @@ import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { Countdown } from '@/components/Countdown';
 import { Reveal } from '@/components/Reveal';
 import { QueueResponse } from '@/types/database';
-import { ChevronDown, Lock, ArrowRight, ShieldCheck, Music, Eye, MapPin } from 'lucide-react';
+import { useCurrentLot, LotLabels } from '@/hooks/useCurrentLot';
+import { Check, ChevronDown, Lock, ArrowRight, ShieldCheck, Music, Eye, MapPin } from 'lucide-react';
 
 import heroMask from '../../public/img/masquerade/hero-mask.png';
 import crowdUv from '../../public/img/masquerade/crowd-uv.jpg';
@@ -24,7 +25,6 @@ import maskedParty from '../../public/img/masquerade/masked-party.jpg';
 
 type Tab = 'info' | 'regras' | 'faq';
 
-const MARQUEE_ITEMS = ['SEM MÁSCARA, SEM ENTRADA', '31.10', 'SJC', 'LOTE 01', 'OPEN BAR', 'DJ SET ATÉ 05H', 'LOCAL SECRETO'];
 
 const EXPERIENCE: Array<{
   img: StaticImageData;
@@ -66,7 +66,9 @@ const EXPERIENCE: Array<{
   },
 ];
 
-const GUIDE: Array<{ id: Tab; title: string; accent: string; content: React.ReactNode }> = [
+const buildMarquee = (lot: LotLabels) => ['SEM MÁSCARA, SEM ENTRADA', '31.10', 'SJC', lot.code, 'OPEN BAR', 'DJ SET ATÉ 05H', 'LOCAL SECRETO'];
+
+const buildGuide = (lot: LotLabels): Array<{ id: Tab; title: string; accent: string; content: React.ReactNode }> => [
   {
     id: 'info',
     title: '01 · O QUE ROLA',
@@ -94,17 +96,19 @@ const GUIDE: Array<{ id: Tab; title: string; accent: string; content: React.Reac
   },
   {
     id: 'faq',
-    title: '03 · COMO FUNCIONA O LOTE 1',
+    title: `03 · COMO FUNCIONA O ${lot.name}`,
     accent: '#8A3CFF',
     content: (
       <>
-        <p><strong className="text-[#E8E8EF]">Prioridade na pré-venda:</strong> Quem se cadastra primeiro recebe o acesso ao 1º Lote direto no WhatsApp e e-mail com chave PIX exclusiva.</p>
+        <p><strong className="text-[#E8E8EF]">Prioridade na pré-venda:</strong> Quem se cadastra primeiro recebe o acesso ao {lot.name} direto no WhatsApp e e-mail com chave PIX exclusiva.</p>
         <p><strong className="text-[#E8E8EF]">Inscrição gratuita:</strong> Entrar na lista de pré-venda não tem nenhum custo.</p>
         <p><strong className="text-[#E8E8EF]">Tempo limite de pagamento:</strong> Cada liberação possui um prazo de validade. Não pagando dentro do prazo, a vaga passa para o próximo da lista.</p>
       </>
     ),
   },
 ];
+
+const DONE_TEXT = ['Feito. Seu lugar está garantido.', 'Feito. Liberação recebida.', 'Feito. Ingresso pago.'];
 
 function SectionLabel({ index, children }: { index: string; children: React.ReactNode }) {
   return (
@@ -121,6 +125,10 @@ export default function Home() {
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab | null>(null);
+  const lot = useCurrentLot();
+  const isPaid = ticketData?.payment_status === 'approved';
+  const marqueeItems = buildMarquee(lot);
+  const guide = buildGuide(lot);
   const heroRef = useRef<HTMLElement>(null);
   const accessRef = useRef<HTMLElement>(null);
 
@@ -241,7 +249,7 @@ export default function Home() {
                   onClick={openJoin}
                   className="cta-neon bg-[#FF2E3B] hover:bg-[#ff424e] active:scale-[0.99] text-[#E8E8EF] font-persona text-xl uppercase py-4 px-6 tracking-wider flex items-center justify-center gap-3 transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E8E8EF]"
                 >
-                  <span>ENTRAR NA FILA DO 1º LOTE</span>
+                  <span>ENTRAR NA FILA DO {lot.name}</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
                 <button
@@ -265,7 +273,7 @@ export default function Home() {
           <div className="flex w-max animate-marquee font-data text-[11px] uppercase tracking-[0.3em] text-[#E8E8EF]/80">
             {[0, 1].map((copy) => (
               <div key={copy} className="flex shrink-0">
-                {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, i) => (
+                {[...marqueeItems, ...marqueeItems].map((item, i) => (
                   <span key={`${copy}-${i}`} className="flex items-center gap-6 px-6">
                     <span className={item === 'SEM MÁSCARA, SEM ENTRADA' ? 'text-[#FF2E3B]' : ''}>{item}</span>
                     <PersonaMaskIcon className="w-4 h-2.5" fillColor="#8A3CFF" />
@@ -280,14 +288,21 @@ export default function Home() {
         <section ref={accessRef} id="acesso" className="relative max-w-6xl mx-auto px-4 py-20 md:py-28 scroll-mt-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
             <Reveal className="lg:col-span-6">
-              <SectionLabel index="01">ACESSO ANTECIPADO</SectionLabel>
+              {/* Com o bilhete na tela, o texto confirma o lugar em vez de pedir cadastro */}
+              <SectionLabel index="01">
+                {isPaid ? 'INGRESSO PAGO' : ticketData ? 'LUGAR RESERVADO' : 'ACESSO ANTECIPADO'}
+              </SectionLabel>
               <h2 className="font-persona text-5xl sm:text-6xl uppercase leading-[0.9] tracking-tight mb-5">
-                GARANTA SEU LUGAR
+                {isPaid ? 'SEU INGRESSO' : ticketData ? 'VOCÊ JÁ ESTÁ' : 'GARANTA SEU LUGAR'}
                 <br />
-                <span className="text-[#8A3CFF]">NA FILA DO 1º LOTE</span>
+                <span className="text-[#8A3CFF]">{isPaid ? 'ESTÁ CONFIRMADO' : `NA FILA DO ${lot.name}`}</span>
               </h2>
               <p className="font-data text-xs text-[#5B5B66] uppercase leading-relaxed tracking-wide mb-8 max-w-md">
-                Garanta prioridade na compra antes da abertura ao público geral. Vagas limitadas para o 1º lote.
+                {isPaid
+                  ? 'Pagamento aprovado. O ingresso oficial foi enviado para o seu e-mail. Nos vemos no baile, de máscara.'
+                  : ticketData
+                    ? `Sua prioridade está ativa. Quando o ${lot.name.toLowerCase()} for liberado, a chave PIX chega no seu WhatsApp e e-mail.`
+                    : `Garanta prioridade na compra antes da abertura ao público geral. Vagas limitadas para o ${lot.name.toLowerCase()}.`}
               </p>
 
               {/* Pílulas em formato de canhoto de ingresso */}
@@ -295,7 +310,7 @@ export default function Home() {
                 {[
                   { label: 'OPEN BAR', value: 'NOITE TODA', color: 'text-[#8A3CFF] font-bold' },
                   { label: 'SOM', value: 'DJ SET ATÉ 05H', color: '' },
-                  { label: 'ACESSO', value: '1º LOTE', color: 'text-[#FF2E3B] font-bold' },
+                  { label: 'ACESSO', value: isPaid ? 'PAGO' : lot.name, color: 'text-[#FF2E3B] font-bold' },
                 ].map((pill) => (
                   <div
                     key={pill.label}
@@ -314,17 +329,27 @@ export default function Home() {
                   ['ENTRE NA FILA', 'Cadastro gratuito, leva menos de um minuto.'],
                   ['RECEBA A LIBERAÇÃO', 'Chave PIX exclusiva no WhatsApp e no e-mail.'],
                   ['PAGUE NO PRAZO', 'Bilhete oficial com o local secreto revelado.'],
-                ].map(([title, text], i) => (
-                  <li key={title} className="flex gap-4 items-start">
-                    <span className="font-persona text-3xl text-[#1F1F24] leading-none w-8 shrink-0" style={{ WebkitTextStroke: '1px #8A3CFF' }}>
-                      {i + 1}
-                    </span>
-                    <div>
-                      <strong className="block text-[#E8E8EF] tracking-widest">{title}</strong>
-                      <span className="text-[#5B5B66] normal-case">{text}</span>
-                    </div>
-                  </li>
-                ))}
+                ].map(([title, text], i) => {
+                  // Na fila: etapa 1 cumprida. Pago: todas cumpridas
+                  const done = isPaid || (Boolean(ticketData) && i === 0);
+                  return (
+                    <li key={title} className={`flex gap-4 items-start ${done ? 'opacity-60' : ''}`}>
+                      {done ? (
+                        <span className="w-8 shrink-0 flex justify-center pt-0.5">
+                          <Check className="w-6 h-6 text-[#8A3CFF]" />
+                        </span>
+                      ) : (
+                        <span className="font-persona text-3xl text-[#1F1F24] leading-none w-8 shrink-0" style={{ WebkitTextStroke: '1px #8A3CFF' }}>
+                          {i + 1}
+                        </span>
+                      )}
+                      <div>
+                        <strong className={`block text-[#E8E8EF] tracking-widest ${done ? 'line-through decoration-[#8A3CFF]' : ''}`}>{title}</strong>
+                        <span className="text-[#5B5B66] normal-case">{done ? DONE_TEXT[i] : text}</span>
+                      </div>
+                    </li>
+                  );
+                })}
               </ol>
             </Reveal>
 
@@ -337,6 +362,8 @@ export default function Home() {
                   email={ticketData.email}
                   createdAt={ticketData.created_at}
                   alreadyRegistered={ticketData.already_registered}
+                  paid={isPaid}
+                  lotName={lot.name}
                   onReset={() => setTicketData(null)}
                 />
               ) : (
@@ -352,7 +379,7 @@ export default function Home() {
                         </span>
                       </div>
                       <span className="font-data text-[9px] text-[#8A3CFF] bg-[#8A3CFF]/10 px-2 py-0.5 border border-[#8A3CFF]/20 uppercase tracking-widest">
-                        LOTE 01
+                        {lot.code}
                       </span>
                     </div>
 
@@ -365,7 +392,7 @@ export default function Home() {
                       </div>
 
                       <p className="font-data text-xs text-[#5B5B66] uppercase leading-relaxed tracking-wide">
-                        Garanta prioridade na compra antes da abertura ao público geral. Vagas limitadas para o 1º lote.
+                        Garanta prioridade na compra antes da abertura ao público geral. Vagas limitadas para o {lot.name.toLowerCase()}.
                       </p>
 
                       <div className="crosshair-corners bg-[#0B0B0D] p-4 font-data flex items-end justify-between gap-4">
@@ -386,7 +413,7 @@ export default function Home() {
                         onClick={openJoin}
                         className="cta-neon w-full bg-[#FF2E3B] hover:bg-[#ff424e] active:scale-[0.99] text-[#E8E8EF] font-persona text-xl sm:text-2xl uppercase py-4 px-6 tracking-wider flex items-center justify-center gap-3 transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E8E8EF]"
                       >
-                        <span>ENTRAR NA FILA DO 1º LOTE</span>
+                        <span>ENTRAR NA FILA DO {lot.name}</span>
                         <ArrowRight className="w-5 h-5 text-white" />
                       </button>
 
@@ -536,7 +563,7 @@ export default function Home() {
             </div>
 
             <div className="space-y-2">
-              {GUIDE.map((item) => {
+              {guide.map((item) => {
                 const open = activeTab === item.id;
                 return (
                   <div
@@ -578,7 +605,7 @@ export default function Home() {
             <div className="glow-uv w-[520px] h-[320px] left-[calc(50%-260px)] -bottom-40" />
             <Reveal className="relative max-w-6xl mx-auto px-4 py-20 md:py-24 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
               <div>
-                <span className="font-data text-[10px] text-[#8A3CFF] uppercase tracking-widest">{'// '}LOTE 01 · VAGAS LIMITADAS</span>
+                <span className="font-data text-[10px] text-[#8A3CFF] uppercase tracking-widest">{'// '}{lot.code} · VAGAS LIMITADAS</span>
                 <h2 className="font-persona text-5xl sm:text-6xl uppercase leading-[0.9] tracking-tight mt-2">
                   A MÁSCARA É SUA.
                   <br />
@@ -623,6 +650,7 @@ export default function Home() {
 
       <JoinQueueModal
         isOpen={isJoinModalOpen}
+        lotName={lot.name}
         onClose={() => setIsJoinModalOpen(false)}
         onSuccess={(data) => setTicketData(data)}
       />
