@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { lotLabels } from '@/lib/lots/labels';
+import { getOrderLotLabels } from '@/lib/lots/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPaymentProvider, isSupabaseConfigured } from '@/lib/payments';
 import { getWebhookUrl, isUuid } from '@/lib/payments/service';
@@ -114,13 +116,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, data: { ...base, status: 'sold_out' } });
     }
 
-    const currentLot = lot as { name: string; price_cents: number };
+    const currentLot = lot as { sort_order: number; price_cents: number };
     return NextResponse.json({
       success: true,
       data: {
         ...base,
         status: 'available',
-        lot: { name: currentLot.name, priceCents: currentLot.price_cents },
+        lot: { name: lotLabels(currentLot.sort_order).name, priceCents: currentLot.price_cents },
       },
     });
   } catch (err) {
@@ -193,11 +195,13 @@ export async function POST(req: NextRequest) {
       .eq('id', leadId)
       .single();
 
+    const lotName = (await getOrderLotLabels(reservation.order_id).catch(() => null))?.name ?? reservation.lot_name;
+
     try {
       const checkout = await provider.createCheckout({
         orderId: reservation.order_id,
         amountCents: reservation.amount_cents,
-        description: `Ingresso Baile da Lagoa · ${reservation.lot_name}`,
+        description: `Ingresso Baile da Lagoa · ${lotName}`,
         expiresInMinutes: RESERVATION_MINUTES,
         customer: { name: lead!.name, email: lead!.email, phone: lead!.phone },
         redirectUrl: `${getAppUrl(req.nextUrl.origin)}/pagamento/retorno`,

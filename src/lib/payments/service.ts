@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAppUrl } from '@/lib/app-url';
 import { sendTicketEmail } from '@/lib/notifications/email';
+import { getOrderLotLabels } from '@/lib/lots/server';
 import { getPaymentProvider } from '.';
 import { PaymentProvider, PaymentReference } from './types';
 
@@ -110,13 +111,16 @@ export async function confirmOrderPayment(
     return { status: 'already_confirmed', ticketCode: result.ticket_code };
   }
 
+  // Ingresso leva o lote em que foi comprado (rótulo pelo sort_order)
+  const lot = await getOrderLotLabels(order.id).catch(() => null);
+
   return {
     status: 'confirmed',
     ticketCode: result.ticket_code,
     issued: {
       name: result.lead_name,
       email: result.lead_email,
-      lotName: result.lot_name,
+      lotName: lot?.name ?? result.lot_name,
       receiptUrl: result.receipt_url,
     },
   };

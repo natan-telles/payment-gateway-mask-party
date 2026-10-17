@@ -3,15 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import { X, ArrowRight, Loader2 } from 'lucide-react';
 import { PersonaMaskIcon } from './PersonaMaskIcon';
+import { DEFAULT_LOT } from '@/lib/lots/labels';
 import { QueueResponse } from '@/types/database';
 
 interface JoinQueueModalProps {
   isOpen: boolean;
+  lotName?: string;
   onClose: () => void;
   onSuccess: (data: NonNullable<QueueResponse['data']>) => void;
 }
 
-export function JoinQueueModal({ isOpen, onClose, onSuccess }: JoinQueueModalProps) {
+export function JoinQueueModal({ isOpen, lotName = DEFAULT_LOT.name, onClose, onSuccess }: JoinQueueModalProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -120,7 +122,7 @@ export function JoinQueueModal({ isOpen, onClose, onSuccess }: JoinQueueModalPro
           ENTRAR NA LISTA
         </h3>
         <p className="text-xs text-[#5B5B66] mb-5">
-          Garanta seu lugar no 1º Lote. Notificação direta no WhatsApp.
+          Garanta seu lugar no {lotName}. Notificação direta no WhatsApp.
         </p>
 
         {errorMessage && (
@@ -235,7 +237,7 @@ export function JoinQueueModal({ isOpen, onClose, onSuccess }: JoinQueueModalPro
                 </>
               ) : (
                 <>
-                  <span>CONFIRMAR MEU LUGAR NO 1º LOTE</span>
+                  <span>CONFIRMAR MEU LUGAR NO {lotName}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

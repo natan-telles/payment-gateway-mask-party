@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { PersonaMaskIcon } from './PersonaMaskIcon';
+import { DEFAULT_LOT } from '@/lib/lots/labels';
 import { CheckCircle2, Share2, Printer, AlertCircle } from 'lucide-react';
 
 interface TicketBadgeProps {
@@ -12,6 +13,8 @@ interface TicketBadgeProps {
   email: string;
   createdAt: string;
   alreadyRegistered?: boolean;
+  paid?: boolean;
+  lotName?: string;
   onReset?: () => void;
 }
 
@@ -22,6 +25,8 @@ export function TicketBadge({
   email,
   createdAt,
   alreadyRegistered,
+  paid = false,
+  lotName = DEFAULT_LOT.name,
   onReset,
 }: TicketBadgeProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
@@ -85,15 +90,19 @@ export function TicketBadge({
             : 'bg-[#141418] border-[#FF2E3B] text-[#E8E8EF]'
         }`}
       >
-        {alreadyRegistered ? (
+        {paid ? (
+          <CheckCircle2 className="w-4 h-4 text-[#8A3CFF] flex-shrink-0" />
+        ) : alreadyRegistered ? (
           <AlertCircle className="w-4 h-4 text-[#8A3CFF] flex-shrink-0" />
         ) : (
           <CheckCircle2 className="w-4 h-4 text-[#FF2E3B] flex-shrink-0" />
         )}
         <span className="text-[11px] uppercase tracking-wider">
-          {alreadyRegistered
-            ? 'Lugar já reservado. Sua prioridade no lote está ativa.'
-            : 'Lugar garantido na pré-venda do 1º Lote.'}
+          {paid
+            ? 'Ingresso pago. Seu lugar no baile está confirmado.'
+            : alreadyRegistered
+              ? 'Lugar já reservado. Sua prioridade no lote está ativa.'
+              : `Lugar garantido na pré-venda do ${lotName}.`}
         </span>
       </div>
 
@@ -113,7 +122,7 @@ export function TicketBadge({
             </div>
           </div>
           <span className="font-data text-[10px] bg-[#0B0B0D] text-[#E8E8EF] px-2 py-0.5 uppercase font-bold">
-            1º LOTE
+            {paid ? 'PAGO' : lotName}
           </span>
         </div>
 
@@ -126,7 +135,7 @@ export function TicketBadge({
             #{formattedPosition}
           </div>
           <span className="font-data text-[9px] uppercase tracking-widest text-[#8A3CFF] block mt-2">
-            PRIORIDADE GARANTIDA
+            {paid ? 'INGRESSO CONFIRMADO' : 'PRIORIDADE GARANTIDA'}
           </span>
         </div>
 
@@ -162,7 +171,9 @@ export function TicketBadge({
 
         {/* Regra Curta */}
         <div className="p-4 bg-[#141418] border-t border-[#1F1F24] text-[11px] text-[#5B5B66] font-data text-center">
-          SEM MÁSCARA, SEM ENTRADA. AVISO DE LIBERAÇÃO DIRETO NO SEU WHATSAPP.
+          {paid
+            ? 'SEM MÁSCARA, SEM ENTRADA. INGRESSO OFICIAL ENVIADO PARA O SEU E-MAIL.'
+            : 'SEM MÁSCARA, SEM ENTRADA. AVISO DE LIBERAÇÃO DIRETO NO SEU WHATSAPP.'}
         </div>
 
         {/* Ações (no-print) */}

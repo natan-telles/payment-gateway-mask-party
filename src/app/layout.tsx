@@ -24,7 +24,7 @@ const archivo = Archivo({
 
 export const metadata: Metadata = {
   title: "BAILE DA LAGOA // 31.10 · SJC",
-  description: "A noite das máscaras. Uma festa, uma regra: ninguém entra de cara limpa. Lista oficial de pré-venda do 1º lote.",
+  description: "A noite das máscaras. Uma festa, uma regra: ninguém entra de cara limpa. Lista oficial de pré-venda.",
 };
 
 export default function RootLayout({
