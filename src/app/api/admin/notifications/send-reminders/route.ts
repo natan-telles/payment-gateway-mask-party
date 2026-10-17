@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     let remindedCount = 0;
 
     for (const lead of leads) {
-      const paymentUrl = `${appUrl}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`;
+      const paymentUrl = `${appUrl}/checkout/${lead.id}`;
       const res = await sendReminderEmail({
         to: lead.email,
         name: lead.name,

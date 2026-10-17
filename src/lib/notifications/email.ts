@@ -276,3 +276,120 @@ export async function sendReminderEmail({
 
   return { success: true, simulated: true };
 }
+
+interface TicketEmailPayload {
+  to: string;
+  name: string;
+  ticketCode: string;
+  lotName: string;
+  receiptUrl?: string | null;
+}
+
+// Template HTML de Ingresso Confirmado Baile da Lagoa
+function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<TicketEmailPayload, 'to'>) {
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Ingresso Confirmado · Baile da Lagoa</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0B0B0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E8E8EF;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <table width="100%" max-width="540" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #141418; border: 1px solid #1F1F24;">
+          <tr>
+            <td style="padding: 24px; background-color: #8A3CFF; color: #0B0B0D;">
+              <div style="font-size: 11px; font-family: monospace; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
+                A NOITE DAS MÁSCARAS · 31.10 · SJC
+              </div>
+              <div style="font-size: 28px; font-weight: 900; text-transform: uppercase; letter-spacing: -1px; margin-top: 4px;">
+                INGRESSO CONFIRMADO
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              <p style="font-size: 13px; color: #5B5B66; text-transform: uppercase; margin: 0 0 16px 0; font-family: monospace;">
+                Olá, <strong style="color: #E8E8EF;">${name.toUpperCase()}</strong>
+              </p>
+              <p style="font-size: 12px; color: #5B5B66; font-family: monospace; line-height: 1.6; margin: 0 0 20px 0;">
+                Seu pagamento foi confirmado. Apresente o código abaixo na entrada do <strong style="color: #E8E8EF;">Baile da Lagoa</strong>.
+              </p>
+
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; border: 1px solid #1F1F24; margin-bottom: 24px; text-align: center;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <span style="font-size: 9px; font-family: monospace; text-transform: uppercase; color: #5B5B66; letter-spacing: 2px; display: block;">
+                      CÓDIGO DO INGRESSO · ${lotName}
+                    </span>
+                    <div style="font-size: 36px; font-weight: 900; color: #8A3CFF; line-height: 1; margin: 10px 0; font-family: monospace;">
+                      ${ticketCode}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              ${
+                receiptUrl
+                  ? `<p style="font-size: 11px; font-family: monospace; margin: 0 0 24px 0;"><a href="${receiptUrl}" style="color: #8A3CFF;">Ver comprovante de pagamento &rarr;</a></p>`
+                  : ''
+              }
+
+              <div style="border-top: 1px solid #1F1F24; padding-top: 20px; font-size: 11px; color: #5B5B66; line-height: 1.6; font-family: monospace;">
+                <strong style="color: #E8E8EF; text-transform: uppercase;">A Regra:</strong><br>
+                &bull; Sem máscara, sem entrada.<br>
+                &bull; Ingresso pessoal e intransferível.<br>
+                &bull; Local exato em SJC será enviado próximo ao evento.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 14px 24px; background-color: #0B0B0D; border-top: 1px solid #1F1F24; text-align: center; font-size: 9px; color: #5B5B66; font-family: monospace; text-transform: uppercase;">
+              BAILE DA LAGOA · 31.10 · SJC · UMA FESTA. UMA REGRA.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+
+// Envio do Ingresso após confirmação do pagamento
+export async function sendTicketEmail({ to, name, ticketCode, lotName, receiptUrl }: TicketEmailPayload) {
+  const subject = `🎭 Ingresso confirmado · Baile da Lagoa (${ticketCode})`;
+  const html = getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl });
+
+  if (resend) {
+    try {
+      const response = await resend.emails.send({
+        from: emailFrom,
+        to,
+        subject,
+        html,
+      });
+
+      if (response.error) {
+        return { success: false, error: response.error.message, simulated: false };
+      }
+
+      return { success: true, id: response.data?.id, simulated: false };
+    } catch (err: any) {
+      console.error(`Erro ao enviar ingresso para ${to}:`, err);
+      return { success: false, error: err.message, simulated: false };
+    }
+  }
+
+  console.log('------------------------------------------------------------');
+  console.log(`[SIMULADOR DE E-MAIL BAILE DA LAGOA] Ingresso Confirmado`);
+  console.log(`Para: ${to} (${name})`);
+  console.log(`Assunto: ${subject}`);
+  console.log(`Ingresso: ${ticketCode} · ${lotName}`);
+  console.log('------------------------------------------------------------');
+
+  return { success: true, simulated: true };
+}
