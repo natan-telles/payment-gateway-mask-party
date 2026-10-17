@@ -79,6 +79,7 @@ export interface QueueResponse {
     queue_position: number;
     created_at: string;
     already_registered?: boolean;
+    payment_status?: PaymentStatus;
   };
   error?: string;
 }

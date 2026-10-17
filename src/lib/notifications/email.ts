@@ -11,6 +11,8 @@ interface EmailPayload {
   queuePosition: number;
   paymentUrl?: string;
   expirationHours?: number;
+  /** Rótulo do lote vigente, ex.: "2º LOTE" */
+  lotName: string;
 }
 
 // Template HTML Oficial Baile da Lagoa
@@ -19,11 +21,13 @@ function getReleaseEmailHtml({
   queuePosition,
   paymentUrl,
   expirationHours = 12,
+  lotName,
 }: {
   name: string;
   queuePosition: number;
   paymentUrl: string;
   expirationHours?: number;
+  lotName: string;
 }) {
   const formattedPos = String(queuePosition).padStart(4, '0');
 
@@ -56,7 +60,7 @@ function getReleaseEmailHtml({
                   </td>
                   <td align="right">
                     <span style="background-color: #0B0B0D; color: #E8E8EF; font-size: 10px; font-weight: 700; padding: 4px 8px; text-transform: uppercase; font-family: monospace;">
-                      1º LOTE
+                      ${lotName}
                     </span>
                   </td>
                 </tr>
@@ -72,7 +76,7 @@ function getReleaseEmailHtml({
               </p>
 
               <h2 style="font-size: 22px; font-weight: 900; color: #E8E8EF; text-transform: uppercase; margin: 0 0 20px 0; line-height: 1.2;">
-                SEU LUGAR NO 1º LOTE ESTÁ LIBERADO.
+                SEU LUGAR NO ${lotName} ESTÁ LIBERADO.
               </h2>
 
               <!-- Posição da Lista -->
@@ -149,10 +153,12 @@ function getReminderEmailHtml({
   name,
   queuePosition,
   paymentUrl,
+  lotName,
 }: {
   name: string;
   queuePosition: number;
   paymentUrl: string;
+  lotName: string;
 }) {
   const formattedPos = String(queuePosition).padStart(4, '0');
 
@@ -174,14 +180,14 @@ function getReminderEmailHtml({
                 ÚLTIMO AVISO
               </span>
               <div style="font-size: 24px; font-weight: 900; color: #E8E8EF; text-transform: uppercase; margin-top: 8px;">
-                SEU LUGAR NO 1º LOTE VAI EXPIRAR
+                SEU LUGAR NO ${lotName} VAI EXPIRAR
               </div>
             </td>
           </tr>
           <tr>
             <td style="padding: 28px 24px;">
               <p style="font-size: 12px; color: #5B5B66; font-family: monospace; line-height: 1.6; margin: 0 0 20px 0;">
-                Olá, ${name}. O prazo para pagamento do seu ingresso no 1º Lote do <strong>Baile da Lagoa</strong> (Posição #${formattedPos}) está nas últimas horas. Caso o PIX não seja confirmado, a vaga passa para o próximo da lista.
+                Olá, ${name}. O prazo para pagamento do seu ingresso no ${lotName} do <strong>Baile da Lagoa</strong> (Posição #${formattedPos}) está nas últimas horas. Caso o PIX não seja confirmado, a vaga passa para o próximo da lista.
               </p>
 
               <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
@@ -208,9 +214,11 @@ function getReminderEmailHtml({
 function getConfirmationEmailHtml({
   name,
   queuePosition,
+  lotName,
 }: {
   name: string;
   queuePosition: number;
+  lotName: string;
 }) {
   const formattedPos = String(queuePosition).padStart(4, '0');
 
@@ -271,7 +279,7 @@ function getConfirmationEmailHtml({
                       #${formattedPos}
                     </div>
                     <span style="font-size: 10px; color: #5B5B66; text-transform: uppercase; font-family: monospace;">
-                      AGUARDANDO LIBERAÇÃO DO 1º LOTE
+                      AGUARDANDO LIBERAÇÃO DO ${lotName}
                     </span>
                   </td>
                 </tr>
@@ -295,7 +303,7 @@ function getConfirmationEmailHtml({
               </table>
 
               <p style="font-size: 11px; color: #5B5B66; font-family: monospace; line-height: 1.6; margin: 0 0 24px 0;">
-                Assim que a pré-venda do 1º Lote for liberada para a sua posição, você receberá uma notificação direta no WhatsApp e no e-mail com a sua chave PIX exclusiva e prazo limite de pagamento.
+                Assim que a pré-venda do ${lotName} for liberada para a sua posição, você receberá uma notificação direta no WhatsApp e no e-mail com a sua chave PIX exclusiva e prazo limite de pagamento.
               </p>
             </td>
           </tr>
@@ -313,13 +321,15 @@ export async function sendQueueConfirmationEmail({
   to,
   name,
   queuePosition,
+  lotName,
 }: {
   to: string;
   name: string;
   queuePosition: number;
+  lotName: string;
 }) {
-  const subject = `🎭 Lugar reservado na fila do 1º Lote · Baile da Lagoa (Posição #${queuePosition})`;
-  const html = getConfirmationEmailHtml({ name, queuePosition });
+  const subject = `🎭 Lugar reservado na fila do ${lotName} · Baile da Lagoa (Posição #${queuePosition})`;
+  const html = getConfirmationEmailHtml({ name, queuePosition, lotName });
 
   if (resend) {
     try {
@@ -360,9 +370,10 @@ export async function sendQueueReleaseEmail({
   queuePosition,
   paymentUrl = `${appUrl}?checkout=true`,
   expirationHours = 12,
+  lotName,
 }: EmailPayload) {
-  const subject = `🎭 Seu lugar no 1º Lote está liberado · Baile da Lagoa (Posição #${queuePosition})`;
-  const html = getReleaseEmailHtml({ name, queuePosition, paymentUrl, expirationHours });
+  const subject = `🎭 Seu lugar no ${lotName} está liberado · Baile da Lagoa (Posição #${queuePosition})`;
+  const html = getReleaseEmailHtml({ name, queuePosition, paymentUrl, expirationHours, lotName });
 
   if (resend) {
     try {
@@ -387,7 +398,7 @@ export async function sendQueueReleaseEmail({
   }
 
   console.log('------------------------------------------------------------');
-  console.log(`[SIMULADOR DE E-MAIL BAILE DA LAGOA] Liberação de Lote 1`);
+  console.log(`[SIMULADOR DE E-MAIL BAILE DA LAGOA] Liberação do ${lotName}`);
   console.log(`Para: ${to} (${name})`);
   console.log(`Assunto: ${subject}`);
   console.log(`Posição: #${queuePosition}`);
@@ -403,9 +414,10 @@ export async function sendReminderEmail({
   name,
   queuePosition,
   paymentUrl = `${appUrl}?checkout=true`,
+  lotName,
 }: EmailPayload) {
   const subject = `⚠️ Último aviso: Seu ingresso no Baile da Lagoa expira em breve (Posição #${queuePosition})`;
-  const html = getReminderEmailHtml({ name, queuePosition, paymentUrl });
+  const html = getReminderEmailHtml({ name, queuePosition, paymentUrl, lotName });
 
   if (resend) {
     try {

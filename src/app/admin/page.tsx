@@ -22,8 +22,10 @@ import {
 import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { AdminNavTabs } from '@/components/AdminNavTabs';
 import { WaitingQueueEntry } from '@/types/database';
+import { useCurrentLot } from '@/hooks/useCurrentLot';
 
 export default function AdminPage() {
+  const lot = useCurrentLot();
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -224,7 +226,7 @@ export default function AdminPage() {
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
     const text = encodeURIComponent(
-      `Olá, ${lead.name.split(' ')[0]}!\n\nSua prioridade na fila do *BAILE PERSONA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).\n\nSeu acesso para compra de ingresso no 1º Lote está liberado por tempo limitado.\n\nLink de compra: ${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`
+      `Olá, ${lead.name.split(' ')[0]}!\n\nSua prioridade na fila do *BAILE PERSONA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).\n\nSeu acesso para compra de ingresso no ${lot.name} está liberado por tempo limitado.\n\nLink de compra: ${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`
     );
 
     const waUrl = `https://wa.me/${phoneWithDDI}?text=${text}`;

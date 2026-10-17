@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendQueueConfirmationEmail } from '@/lib/notifications/email';
-import { JoinQueueInput, QueueResponse } from '@/types/database';
+import { getCurrentLotLabels } from '@/lib/lots/server';
+import { DEFAULT_LOT } from '@/lib/lots/labels';
+
+// O e-mail de confirmação cita o lote vigente; se o banco falhar, segue com o padrão
+const currentLotName = () => getCurrentLotLabels().then((lot) => lot.name, () => DEFAULT_LOT.name);
+import { JoinQueueInput, PaymentStatus, QueueResponse } from '@/types/database';
 
 // Cache / fallback em memória para testes locais quando o Supabase ainda não estiver configurado no .env
 let mockCounter = 42;
@@ -49,7 +54,7 @@ export async function POST(req: NextRequest) {
         // Verifica duplicidade
         const { data: existing } = await supabase
           .from('waiting_queue')
-          .select('id, queue_position, name, phone, email, created_at')
+          .select('id, queue_position, name, phone, email, created_at, payment_status')
           .or(`phone.eq.${cleanPhone},email.eq.${cleanEmail}`)
           .maybeSingle();
 
@@ -85,11 +90,12 @@ export async function POST(req: NextRequest) {
         }
 
         if (!existing) {
-          sendQueueConfirmationEmail({
+          currentLotName().then((lotName) => sendQueueConfirmationEmail({
+            lotName,
             to: cleanEmail,
             name: name.trim(),
             queuePosition: Number(inserted.queue_position),
-          }).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
+          })).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
         }
 
         return NextResponse.json<QueueResponse>({
@@ -104,12 +110,24 @@ export async function POST(req: NextRequest) {
       const rpcResult = data as any;
       const isAlreadyRegistered = Boolean(rpcResult.already_registered);
 
+      // Quem já estava na fila pode ter pago: a tela mostra o ingresso pago nesse caso
+      let paymentStatus: PaymentStatus | undefined;
+      if (isAlreadyRegistered) {
+        const { data: lead } = await supabase
+          .from('waiting_queue')
+          .select('payment_status')
+          .eq('id', rpcResult.id)
+          .maybeSingle();
+        paymentStatus = lead?.payment_status ?? undefined;
+      }
+
       if (!isAlreadyRegistered) {
-        sendQueueConfirmationEmail({
+        currentLotName().then((lotName) => sendQueueConfirmationEmail({
+          lotName,
           to: rpcResult.email,
           name: rpcResult.name,
           queuePosition: Number(rpcResult.queue_position),
-        }).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
+        })).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
       }
 
       return NextResponse.json<QueueResponse>({
@@ -122,6 +140,7 @@ export async function POST(req: NextRequest) {
           queue_position: Number(rpcResult.queue_position),
           created_at: rpcResult.created_at,
           already_registered: isAlreadyRegistered,
+          payment_status: paymentStatus,
         },
       });
     }
@@ -154,11 +173,12 @@ export async function POST(req: NextRequest) {
 
     mockStore.set(newEntry.id, newEntry);
 
-    sendQueueConfirmationEmail({
+    currentLotName().then((lotName) => sendQueueConfirmationEmail({
+      lotName,
       to: newEntry.email,
       name: newEntry.name,
       queuePosition: newEntry.queue_position,
-    }).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
+    })).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
 
     return NextResponse.json<QueueResponse>({
       success: true,
@@ -185,7 +205,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const cleanQuery = query.replace(/\D/g, '') || query.trim().toLowerCase();
+    // E-mail com números (ex.: joao12@...) não pode virar só dígitos
+    const cleanQuery = query.includes('@')
+      ? query.trim().toLowerCase()
+      : query.replace(/\D/g, '');
 
     const hasSupabase =
       Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&

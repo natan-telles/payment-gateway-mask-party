@@ -17,6 +17,31 @@ export function CheckStatusModal({ isOpen, onClose, onFound }: CheckStatusModalP
 
   if (!isOpen) return null;
 
+  // Mesmo campo para WhatsApp e e-mail: só números vira máscara de telefone,
+  // qualquer letra ou @ volta para texto livre (e-mail)
+  const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+
+    if (/[a-zA-Z@]/.test(value)) {
+      const wasPhone = !/[a-zA-Z@]/.test(query) && /\d/.test(query);
+      setQuery(wasPhone ? value.replace(/[()\s-]/g, '') : value);
+      return;
+    }
+
+    let digits = value.replace(/\D/g, '');
+    if (digits.length > 11) digits = digits.slice(0, 11);
+
+    if (digits.length > 6) {
+      setQuery(`(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`);
+    } else if (digits.length > 2) {
+      setQuery(`(${digits.slice(0, 2)}) ${digits.slice(2)}`);
+    } else if (digits.length > 0) {
+      setQuery(`(${digits}`);
+    } else {
+      setQuery('');
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -80,7 +105,7 @@ export function CheckStatusModal({ isOpen, onClose, onFound }: CheckStatusModalP
               type="text"
               required
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={handleQueryChange}
               placeholder="(12) 99999-9999 ou seu@email.com"
               className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-data text-xs outline-none transition-colors"
               autoFocus
