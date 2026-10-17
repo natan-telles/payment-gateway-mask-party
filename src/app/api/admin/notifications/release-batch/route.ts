@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAppUrl } from '@/lib/app-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendQueueReleaseEmail } from '@/lib/notifications/email';
 
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = getAppUrl(req.nextUrl.origin);
     const results = [];
     const idsToUpdate: string[] = [];
 
