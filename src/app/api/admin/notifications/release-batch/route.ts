@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Disparar e-mail de liberação para cada participante
     for (const lead of leads) {
-      const paymentUrl = `${appUrl}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`;
+      const paymentUrl = `${appUrl}/checkout/${lead.id}`;
       const emailRes = await sendQueueReleaseEmail({
         to: lead.email,
         name: lead.name,
@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
         .update({
           notification_status: 'sent',
           notification_date: new Date().toISOString(),
+          payment_deadline: new Date(Date.now() + (Number(expirationHours) || 12) * 60 * 60 * 1000).toISOString(),
         })
         .in('id', idsToUpdate);
 
