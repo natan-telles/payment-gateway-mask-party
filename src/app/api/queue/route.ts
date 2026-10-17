@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { sendQueueConfirmationEmail } from '@/lib/notifications/email';
 import { JoinQueueInput, QueueResponse } from '@/types/database';
 
 // Cache / fallback em memória para testes locais quando o Supabase ainda não estiver configurado no .env
@@ -83,6 +84,14 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        if (!existing) {
+          sendQueueConfirmationEmail({
+            to: cleanEmail,
+            name: name.trim(),
+            queuePosition: Number(inserted.queue_position),
+          }).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
+        }
+
         return NextResponse.json<QueueResponse>({
           success: true,
           data: {
@@ -93,6 +102,16 @@ export async function POST(req: NextRequest) {
       }
 
       const rpcResult = data as any;
+      const isAlreadyRegistered = Boolean(rpcResult.already_registered);
+
+      if (!isAlreadyRegistered) {
+        sendQueueConfirmationEmail({
+          to: rpcResult.email,
+          name: rpcResult.name,
+          queuePosition: Number(rpcResult.queue_position),
+        }).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
+      }
+
       return NextResponse.json<QueueResponse>({
         success: true,
         data: {
@@ -102,7 +121,7 @@ export async function POST(req: NextRequest) {
           email: rpcResult.email,
           queue_position: Number(rpcResult.queue_position),
           created_at: rpcResult.created_at,
-          already_registered: Boolean(rpcResult.already_registered),
+          already_registered: isAlreadyRegistered,
         },
       });
     }
@@ -134,6 +153,12 @@ export async function POST(req: NextRequest) {
     };
 
     mockStore.set(newEntry.id, newEntry);
+
+    sendQueueConfirmationEmail({
+      to: newEntry.email,
+      name: newEntry.name,
+      queuePosition: newEntry.queue_position,
+    }).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
 
     return NextResponse.json<QueueResponse>({
       success: true,

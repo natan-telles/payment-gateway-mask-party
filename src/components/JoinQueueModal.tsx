@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRight, Loader2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { X, ArrowRight, Loader2 } from 'lucide-react';
 import { PersonaMaskIcon } from './PersonaMaskIcon';
 import { QueueResponse } from '@/types/database';
 
@@ -20,7 +20,6 @@ export function JoinQueueModal({ isOpen, onClose, onSuccess }: JoinQueueModalPro
   const [instagram, setInstagram] = useState('');
   const [source, setSource] = useState('direct');
 
-  const [showOptional, setShowOptional] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -178,55 +177,48 @@ export function JoinQueueModal({ isOpen, onClose, onSuccess }: JoinQueueModalPro
             </div>
           </div>
 
-          {/* Accordion compacto para opcionais */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowOptional(!showOptional)}
-              className="text-[10px] text-[#5B5B66] hover:text-[#8A3CFF] flex items-center gap-1 py-1 transition-colors uppercase"
-            >
-              <span>{showOptional ? '- Menos detalhes' : '+ Adicionar bairro / Instagram (opcional)'}</span>
-              {showOptional ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
+          {/* Campos Complementares Opcionais (Diretamente visíveis sem botão) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-0.5">
+            <div>
+              <label className="block text-[10px] uppercase text-[#5B5B66] mb-1 font-bold">
+                Idade <span className="font-normal text-[9px] lowercase opacity-75">(opc.)</span>
+              </label>
+              <input
+                type="number"
+                min="16"
+                max="99"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="Ex: 21"
+                className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-3 py-2 text-xs outline-none transition-all placeholder:text-[#5B5B66]"
+              />
+            </div>
 
-            {showOptional && (
-              <div className="grid grid-cols-3 gap-2 pt-2 animate-in fade-in duration-200">
-                <div>
-                  <label className="block text-[9px] uppercase text-[#5B5B66] mb-1">Idade</label>
-                  <input
-                    type="number"
-                    min="16"
-                    max="99"
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    placeholder="20"
-                    className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-2 py-2 text-xs outline-none"
-                  />
-                </div>
+            <div>
+              <label className="block text-[10px] uppercase text-[#5B5B66] mb-1 font-bold">
+                Bairro <span className="font-normal text-[9px] lowercase opacity-75">(opc.)</span>
+              </label>
+              <input
+                type="text"
+                value={neighborhood}
+                onChange={(e) => setNeighborhood(e.target.value)}
+                placeholder="Ex: Aquarius"
+                className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-3 py-2 text-xs outline-none uppercase transition-all placeholder:text-[#5B5B66]"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-[9px] uppercase text-[#5B5B66] mb-1">Bairro</label>
-                  <input
-                    type="text"
-                    value={neighborhood}
-                    onChange={(e) => setNeighborhood(e.target.value)}
-                    placeholder="Ex: Aquarius"
-                    className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-2 py-2 text-xs outline-none uppercase"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[9px] uppercase text-[#5B5B66] mb-1">Instagram</label>
-                  <input
-                    type="text"
-                    value={instagram}
-                    onChange={(e) => setInstagram(e.target.value)}
-                    placeholder="@user"
-                    className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-2 py-2 text-xs outline-none"
-                  />
-                </div>
-              </div>
-            )}
+            <div>
+              <label className="block text-[10px] uppercase text-[#5B5B66] mb-1 font-bold">
+                Instagram <span className="font-normal text-[9px] lowercase opacity-75">(opc.)</span>
+              </label>
+              <input
+                type="text"
+                value={instagram}
+                onChange={(e) => setInstagram(e.target.value)}
+                placeholder="@user"
+                className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] px-3 py-2 text-xs outline-none transition-all placeholder:text-[#5B5B66]"
+              />
+            </div>
           </div>
 
           {/* Botão de Submissão Vermelho Sinal */}
