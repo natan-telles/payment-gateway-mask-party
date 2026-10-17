@@ -40,6 +40,8 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] selection:bg-[#8A3CFF] selection:text-white antialiased relative">
         {/* Camada sutil de scanlines em toda a página (regra do Mídia Kit) */}
         <div className="fixed inset-0 pointer-events-none z-50 scanlines-overlay opacity-30" />
+        {/* Grão de filme por cima das scanlines */}
+        <div className="fixed -inset-[10%] pointer-events-none z-50 grain-overlay opacity-[0.06]" />
         {children}
       </body>
     </html>
