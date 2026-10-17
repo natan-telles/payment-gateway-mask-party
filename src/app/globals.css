@@ -146,3 +146,274 @@ body {
     background: white !important;
   }
 }
+
+/* ==========================================================
+   EFEITOS DA LANDING (máscaras, glow, grão, glitch)
+   ========================================================== */
+
+/* Grão de filme sobre a página, somado às scanlines */
+.grain-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grainShift 1.2s steps(6) infinite;
+}
+
+@keyframes grainShift {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-3%, 2%); }
+  40% { transform: translate(2%, -3%); }
+  60% { transform: translate(-2%, -1%); }
+  80% { transform: translate(3%, 3%); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Luzes UV / vermelha que flutuam devagar atrás do hero */
+@keyframes glowDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.55; }
+  50% { transform: translate(6%, -4%) scale(1.15); opacity: 0.85; }
+}
+
+.glow-uv,
+.glow-red {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+  animation: glowDrift 14s ease-in-out infinite;
+}
+
+.glow-uv { background: rgba(138, 60, 255, 0.45); }
+.glow-red { background: rgba(255, 46, 59, 0.35); animation-delay: -7s; }
+
+/* Glitch RGB no wordmark (rápido na entrada e no hover) */
+.glitch {
+  position: relative;
+}
+
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.glitch::before { color: var(--uv); mix-blend-mode: screen; }
+.glitch::after { color: var(--red-sinal); mix-blend-mode: screen; }
+
+.glitch.glitch-intro::before,
+.glitch:hover::before {
+  animation: glitchA 0.9s steps(2) 1 both;
+}
+
+.glitch.glitch-intro::after,
+.glitch:hover::after {
+  animation: glitchB 0.9s steps(2) 1 both;
+}
+
+@keyframes glitchA {
+  0% { opacity: 0.9; transform: translate(-4px, 0); clip-path: inset(10% 0 60% 0); }
+  25% { transform: translate(3px, -1px); clip-path: inset(55% 0 20% 0); }
+  50% { transform: translate(-2px, 1px); clip-path: inset(30% 0 45% 0); }
+  75% { transform: translate(2px, 0); clip-path: inset(70% 0 5% 0); }
+  100% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 100% 0); }
+}
+
+@keyframes glitchB {
+  0% { opacity: 0.9; transform: translate(4px, 0); clip-path: inset(60% 0 15% 0); }
+  25% { transform: translate(-3px, 1px); clip-path: inset(15% 0 65% 0); }
+  50% { transform: translate(2px, -1px); clip-path: inset(40% 0 35% 0); }
+  75% { transform: translate(-2px, 0); clip-path: inset(5% 0 80% 0); }
+  100% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 100% 0); }
+}
+
+/* CTA vermelho: pulso de neon + brilho que atravessa no hover */
+@keyframes ctaPulse {
+  0%, 100% { box-shadow: 0 0 22px rgba(255, 46, 59, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(255, 46, 59, 0.55); }
+}
+
+.cta-neon {
+  position: relative;
+  overflow: hidden;
+  animation: ctaPulse 3s ease-in-out infinite;
+}
+
+.cta-neon::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cta-neon:hover::after {
+  left: 120%;
+}
+
+/* Borda animada UV → vermelho → UV */
+@keyframes borderFlow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.border-flow {
+  position: relative;
+  isolation: isolate;
+}
+
+.border-flow::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  background: linear-gradient(90deg, var(--uv), var(--red-sinal), var(--uv), var(--red-sinal));
+  background-size: 200% 100%;
+  animation: borderFlow 6s linear infinite;
+}
+
+/* Faixa letreiro */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 32s linear infinite;
+}
+
+/* Fotos em duotone UV: preto e branco + cor da marca por cima */
+/* Sem position aqui: CSS fora de @layer vence os utilitários do Tailwind,
+   então quem usa define `relative` ou `absolute` na própria classe */
+.duotone {
+  overflow: hidden;
+  background: var(--bg-pista);
+}
+
+.duotone img {
+  filter: grayscale(0.6) saturate(1.1) contrast(1.12) brightness(0.88);
+  transition: filter 0.6s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.duotone::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--uv);
+  mix-blend-mode: multiply;
+  opacity: 0.45;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.duotone.duotone-red::after { background: var(--red-sinal); }
+
+.duotone:hover img {
+  filter: grayscale(0) saturate(1.3) contrast(1.1) brightness(1.05);
+  transform: scale(1.04);
+}
+
+.duotone:hover::after {
+  opacity: 0.15;
+}
+
+/* Variante clara (cards de "A Noite"): soft-light tinge sem escurecer */
+.duotone.duotone-bright img {
+  filter: grayscale(0.15) saturate(1.15) contrast(1.1) brightness(1.35);
+}
+
+.duotone.duotone-bright::after {
+  mix-blend-mode: soft-light;
+  opacity: 0.45;
+}
+
+.duotone.duotone-bright:hover img {
+  filter: grayscale(0) saturate(1.2) contrast(1.1) brightness(1.45);
+}
+
+.duotone.duotone-bright:hover::after {
+  opacity: 0.1;
+}
+
+/* Bilhete com picote nas laterais */
+.ticket-stub {
+  --notch: 7px;
+  mask:
+    radial-gradient(circle var(--notch) at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+
+/* Marcas de mira nos cantos (estilo flyer / mídia kit) */
+.crosshair-corners {
+  background:
+    linear-gradient(var(--fumaca), var(--fumaca)) top left / 10px 1px no-repeat,
+    linear-gradient(var(--fumaca), var(--fumaca)) top left / 1px 10px no-repeat,
+    linear-gradient(var(--fumaca), var(--fumaca)) top right / 10px 1px no-repeat,
+    linear-gradient(var(--fumaca), var(--fumaca)) top right / 1px 10px no-repeat,
+    linear-gradient(var(--fumaca), var(--fumaca)) bottom left / 10px 1px no-repeat,
+    linear-gradient(var(--fumaca), var(--fumaca)) bottom left / 1px 10px no-repeat,
+    linear-gradient(var(--fumaca), var(--fumaca)) bottom right / 10px 1px no-repeat,
+    linear-gradient(var(--fumaca), var(--fumaca)) bottom right / 1px 10px no-repeat;
+}
+
+/* Accordion: altura animada + linha UV que desenha ao abrir */
+.accordion-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.accordion-panel[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.accordion-panel > div {
+  overflow: hidden;
+}
+
+.accordion-line {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-open="true"] > .accordion-line,
+.accordion-item[data-open="true"] .accordion-line {
+  transform: scaleX(1);
+}
+
+/* Revelação ao rolar */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grain-overlay,
+  .glow-uv,
+  .glow-red,
+  .cta-neon,
+  .border-flow::before,
+  .animate-marquee,
+  .pulse-livestream,
+  .glitch::before,
+  .glitch::after {
+    animation: none !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
