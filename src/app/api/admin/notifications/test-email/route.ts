@@ -1,77 +1,146 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Resend } from 'resend';
+import {
+  sendQueueConfirmationEmail,
+  sendQueueReleaseEmail,
+  sendReminderEmail,
+  sendTicketEmail,
+} from '@/lib/notifications/email';
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const to = searchParams.get('to');
+function checkAdminAuth(req: NextRequest) {
+  const authHeader = req.headers.get('x-admin-password');
+  const expected = process.env.ADMIN_PASSWORD || 'admin123';
+  return authHeader === expected;
+}
+
+export async function POST(req: NextRequest) {
+  if (!checkAdminAuth(req)) {
+    return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
+  }
 
   const apiKey = process.env.RESEND_API_KEY;
   const emailFrom = process.env.EMAIL_FROM || 'Baile da Lagoa <onboarding@resend.dev>';
 
-  if (!apiKey) {
-    return NextResponse.json({
-      success: false,
-      error: 'RESEND_API_KEY não está definida nas variáveis de ambiente da Vercel / .env',
-      config: {
-        hasApiKey: false,
-        emailFrom,
-      },
-    });
-  }
-
-  if (!to) {
-    return NextResponse.json({
-      success: false,
-      message: 'Informe o parâmetro ?to=seu_email@dominio.com na URL para testar o envio',
-      config: {
-        hasApiKey: true,
-        apiKeyPrefix: apiKey.slice(0, 6) + '...',
-        emailFrom,
-      },
-    });
-  }
-
   try {
-    const resend = new Resend(apiKey);
-    const { data, error } = await resend.emails.send({
-      from: emailFrom,
-      to,
-      subject: '🧪 Teste de Conexão · Baile da Lagoa / Resend',
-      html: `
-        <div style="font-family: sans-serif; padding: 20px; background: #0B0B0D; color: #E8E8EF;">
-          <h2 style="color: #8A3CFF;">Teste de Conexão Bem-Sucedido!</h2>
-          <p>O Resend está configurado e enviando e-mails com sucesso para o Baile da Lagoa.</p>
-          <p>Remetente: <strong>${emailFrom}</strong></p>
-          <p>Destinatário: <strong>${to}</strong></p>
-        </div>
-      `,
-    });
+    const { to, templateType = 'confirmation' } = await req.json();
 
-    if (error) {
+    if (!to || !to.includes('@')) {
+      return NextResponse.json(
+        { success: false, error: 'Informe um endereço de e-mail válido para o teste.' },
+        { status: 400 }
+      );
+    }
+
+    let result;
+
+    if (templateType === 'release') {
+      result = await sendQueueReleaseEmail({
+        to,
+        name: 'Usuário de Teste',
+        queuePosition: 16,
+        paymentUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}?checkout=true`,
+        expirationHours: 12,
+        lotName: '1º Lote',
+      });
+    } else if (templateType === 'reminder') {
+      result = await sendReminderEmail({
+        to,
+        name: 'Usuário de Teste',
+        queuePosition: 16,
+        paymentUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}?checkout=true`,
+        lotName: '1º Lote',
+      });
+    } else if (templateType === 'ticket') {
+      result = await sendTicketEmail({
+        to,
+        name: 'Usuário de Teste',
+        ticketCode: 'BAILE-0016-TESTE',
+        lotName: '1º Lote',
+      });
+    } else {
+      // Padrão: Confirmação de entrada na fila (template revisado antispam)
+      result = await sendQueueConfirmationEmail({
+        to,
+        name: 'Manuella Lima (Teste)',
+        queuePosition: 16,
+        lotName: '1º Lote',
+      });
+    }
+
+    if (!result.success) {
       return NextResponse.json({
         success: false,
-        error: error.message,
-        details: error,
-        config: {
-          emailFrom,
-          to,
-        },
+        error: result.error || 'Falha ao disparar e-mail via Resend.',
+        config: { emailFrom, hasApiKey: Boolean(apiKey) },
       });
     }
 
     return NextResponse.json({
       success: true,
       message: `E-mail de teste enviado com sucesso para ${to}!`,
-      resendId: data?.id,
-      config: {
-        emailFrom,
-        to,
-      },
+      resendId: result.id,
+      simulated: result.simulated,
+      templateType,
+      config: { emailFrom, hasApiKey: Boolean(apiKey) },
     });
   } catch (err: any) {
     return NextResponse.json({
       success: false,
-      error: err.message,
+      error: err.message || 'Erro inesperado ao processar o envio de teste.',
     });
   }
 }
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const to = searchParams.get('to');
+  const templateType = searchParams.get('type') || 'confirmation';
+
+  if (!to) {
+    return NextResponse.json({
+      success: false,
+      message: 'Informe o parâmetro ?to=seu_email@dominio.com na URL para testar o envio',
+    });
+  }
+
+  const result = await sendQueueConfirmationEmail({
+    to,
+    name: 'Usuário de Teste',
+    queuePosition: 16,
+    lotName: '1º Lote',
+  });
+
+  return NextResponse.json({
+    success: result.success,
+    resendId: result.id,
+    simulated: result.simulated,
+    error: result.error,
+  });
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const to = searchParams.get('to');
+  const templateType = searchParams.get('type') || 'confirmation';
+
+  if (!to) {
+    return NextResponse.json({
+      success: false,
+      message: 'Informe o parâmetro ?to=seu_email@dominio.com na URL para testar o envio',
+    });
+  }
+
+  const result = await sendQueueConfirmationEmail({
+    to,
+    name: 'Usuário de Teste',
+    queuePosition: 16,
+    lotName: '1º Lote',
+  });
+
+  return NextResponse.json({
+    success: result.success,
+    resendId: result.id,
+    simulated: result.simulated,
+    error: result.error,
+  });
+}
+
