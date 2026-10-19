@@ -59,6 +59,15 @@ export default function AdminPage() {
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailFeedback, setTestEmailFeedback] = useState<{ type: 'success' | 'error'; message: string; resendId?: string } | null>(null);
 
+  // Fallback tab state
+  const [emailModalTab, setEmailModalTab] = useState<'teste' | 'fallback'>('teste');
+  const [fallbackSelectedRecord, setFallbackSelectedRecord] = useState<string | null>(null);
+  const [fallbackEmail, setFallbackEmail] = useState('');
+  const [fallbackTemplate, setFallbackTemplate] = useState<'confirmation' | 'release' | 'reminder' | 'ticket'>('release');
+  const [isSendingFallback, setIsSendingFallback] = useState(false);
+  const [fallbackFeedback, setFallbackFeedback] = useState<{ type: 'success' | 'error'; message: string; resendId?: string } | null>(null);
+  const [fallbackSearch, setFallbackSearch] = useState('');
+
   useEffect(() => {
     const saved = sessionStorage.getItem('mask_party_admin_pw');
     if (saved) {
@@ -350,6 +359,58 @@ export default function AdminPage() {
     }
   };
 
+  const handleSendFallbackEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fallbackSelectedRecord) {
+      setFallbackFeedback({ type: 'error', message: 'Selecione um registro da fila.' });
+      return;
+    }
+    if (!fallbackEmail || !fallbackEmail.includes('@')) {
+      setFallbackFeedback({ type: 'error', message: 'Digite um e-mail válido para o reenvio.' });
+      return;
+    }
+
+    setIsSendingFallback(true);
+    setFallbackFeedback(null);
+
+    try {
+      const res = await fetch('/api/admin/notifications/resend-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': password,
+        },
+        body: JSON.stringify({
+          recordId: fallbackSelectedRecord,
+          targetEmail: fallbackEmail,
+          template: fallbackTemplate,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setFallbackFeedback({
+          type: 'success',
+          message: data.message || `E-mail reenviado com sucesso para ${fallbackEmail}!`,
+          resendId: data.resendId,
+        });
+      } else {
+        setFallbackFeedback({
+          type: 'error',
+          message: data.error || 'Falha ao reenviar e-mail.',
+        });
+      }
+    } catch {
+      setFallbackFeedback({
+        type: 'error',
+        message: 'Erro de conexão com o servidor.',
+      });
+    } finally {
+      setIsSendingFallback(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] flex flex-col items-center justify-center p-4">
@@ -530,12 +591,14 @@ export default function AdminPage() {
             <button
               onClick={() => {
                 setTestEmailFeedback(null);
+                setFallbackFeedback(null);
+                setEmailModalTab('teste');
                 setIsTestEmailModalOpen(true);
               }}
               className="bg-[#141418] hover:bg-[#1f1f24] text-[#E8E8EF] py-2.5 px-3.5 uppercase text-xs tracking-wider border border-[#1F1F24] hover:border-[#8A3CFF]/50 flex items-center gap-1.5 transition-colors"
             >
               <Mail className="w-3.5 h-3.5 text-[#8A3CFF]" />
-              <span>E-mail de Teste</span>
+              <span>Enviar Email</span>
             </button>
           </div>
         </div>
@@ -816,94 +879,297 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* MODAL DE E-MAIL DE TESTE */}
+      {/* MODAL DE ENVIO DE E-MAIL (TESTE + FALLBACK) */}
       {isTestEmailModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#141418] border border-[#1F1F24] max-w-md w-full p-6 relative font-data">
+          <div className="bg-[#141418] border border-[#1F1F24] max-w-lg w-full p-6 relative font-data max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsTestEmailModalOpen(false)}
-              className="absolute top-4 right-4 text-[#5B5B66] hover:text-[#E8E8EF] transition-colors"
+              className="absolute top-4 right-4 text-[#5B5B66] hover:text-[#E8E8EF] transition-colors z-10"
             >
               <X className="w-5 h-5" />
             </button>
 
             <span className="text-[9px] uppercase text-[#8A3CFF] tracking-widest block mb-1">
-              // DIAGNÓSTICO & ENTREGABILIDADE
+              // ENVIO DE E-MAIL
             </span>
-            <h3 className="font-persona text-2xl uppercase tracking-tight mb-2">
-              DISPARAR E-MAIL DE TESTE
+            <h3 className="font-persona text-2xl uppercase tracking-tight mb-4">
+              ENVIAR E-MAIL
             </h3>
-            <p className="text-xs text-[#8C8C9A] mb-4">
-              Envie um e-mail com a formatação antispam para seu endereço ou para o <strong>Mail-Tester</strong> para auditar a nota antes de liberar lotes.
-            </p>
 
-            {testEmailFeedback && (
-              <div
-                className={`mb-4 p-3 border text-xs leading-relaxed ${
-                  testEmailFeedback.type === 'success'
-                    ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
-                    : 'bg-red-950/40 border-red-500/50 text-red-300'
+            {/* ABAS */}
+            <div className="flex border-b border-[#1F1F24] mb-5">
+              <button
+                onClick={() => setEmailModalTab('teste')}
+                className={`flex-1 py-2.5 text-xs uppercase tracking-wider font-bold transition-colors ${
+                  emailModalTab === 'teste'
+                    ? 'text-[#8A3CFF] border-b-2 border-[#8A3CFF]'
+                    : 'text-[#5B5B66] hover:text-[#E8E8EF]'
                 }`}
               >
-                <div>{testEmailFeedback.message}</div>
-                {testEmailFeedback.resendId && (
-                  <div className="font-mono text-[10px] text-emerald-400/80 mt-1">
-                    ID Resend: {testEmailFeedback.resendId}
+                Teste
+              </button>
+              <button
+                onClick={() => setEmailModalTab('fallback')}
+                className={`flex-1 py-2.5 text-xs uppercase tracking-wider font-bold transition-colors ${
+                  emailModalTab === 'fallback'
+                    ? 'text-[#8A3CFF] border-b-2 border-[#8A3CFF]'
+                    : 'text-[#5B5B66] hover:text-[#E8E8EF]'
+                }`}
+              >
+                Fallback
+              </button>
+            </div>
+
+            {/* ABA TESTE */}
+            {emailModalTab === 'teste' && (
+              <div>
+                <p className="text-xs text-[#8C8C9A] mb-4">
+                  Envie um e-mail com a formatação antispam para seu endereço ou para o <strong>Mail-Tester</strong> para auditar a nota antes de liberar lotes.
+                </p>
+
+                {testEmailFeedback && (
+                  <div
+                    className={`mb-4 p-3 border text-xs leading-relaxed ${
+                      testEmailFeedback.type === 'success'
+                        ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                        : 'bg-red-950/40 border-red-500/50 text-red-300'
+                    }`}
+                  >
+                    <div>{testEmailFeedback.message}</div>
+                    {testEmailFeedback.resendId && (
+                      <div className="font-mono text-[10px] text-emerald-400/80 mt-1">
+                        ID Resend: {testEmailFeedback.resendId}
+                      </div>
+                    )}
                   </div>
                 )}
+
+                <form onSubmit={handleSendTestEmail} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-[10px] uppercase text-[#8C8C9A] mb-1">
+                      E-mail Destinatário:
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="exemplo@gmail.com ou test-xxx@mail-tester.com"
+                      value={testEmailTo}
+                      onChange={(e) => setTestEmailTo(e.target.value)}
+                      className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase text-[#8C8C9A] mb-1">
+                      Modelo do Template:
+                    </label>
+                    <select
+                      value={testEmailTemplate}
+                      onChange={(e) => setTestEmailTemplate(e.target.value as any)}
+                      className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none cursor-pointer"
+                    >
+                      <option value="confirmation">1. Confirmação de Entrada na Fila</option>
+                      <option value="release">2. Convocação / Liberação de Lote</option>
+                      <option value="reminder">3. Último Aviso / Lembrete</option>
+                      <option value="ticket">4. Ingresso Confirmado</option>
+                    </select>
+                  </div>
+
+                  <div className="bg-[#0B0B0D] border border-[#1F1F24] p-3 text-[11px] text-[#8C8C9A] leading-relaxed">
+                    💡 <strong className="text-[#E8E8EF]">Dica:</strong> Gere um e-mail temporário no <a href="https://www.mail-tester.com" target="_blank" rel="noreferrer" className="text-[#8A3CFF] underline">mail-tester.com</a> para auditar SPF, DKIM e conteúdo.
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSendingTestEmail}
+                    className="w-full bg-[#8A3CFF] hover:bg-[#9a54ff] disabled:opacity-50 text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors"
+                  >
+                    {isSendingTestEmail ? (
+                      <span>DISPARANDO TESTE...</span>
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4" />
+                        <span>ENVIAR E-MAIL DE TESTE</span>
+                      </>
+                    )}
+                  </button>
+                </form>
               </div>
             )}
 
-            <form onSubmit={handleSendTestEmail} className="space-y-4 text-xs">
+            {/* ABA FALLBACK */}
+            {emailModalTab === 'fallback' && (
               <div>
-                <label className="block text-[10px] uppercase text-[#8C8C9A] mb-1">
-                  E-mail Destinatário:
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="exemplo@gmail.com ou test-xxx@mail-tester.com"
-                  value={testEmailTo}
-                  onChange={(e) => setTestEmailTo(e.target.value)}
-                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none"
-                />
-              </div>
+                <p className="text-xs text-[#8C8C9A] mb-4">
+                  Selecione um registro da fila, escolha o modelo de e-mail e reenvie para um endereço alternativo.
+                </p>
 
-              <div>
-                <label className="block text-[10px] uppercase text-[#8C8C9A] mb-1">
-                  Modelo do Template:
-                </label>
-                <select
-                  value={testEmailTemplate}
-                  onChange={(e) => setTestEmailTemplate(e.target.value as any)}
-                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none cursor-pointer"
-                >
-                  <option value="confirmation">1. Confirmação de Entrada na Fila (Template Antispam)</option>
-                  <option value="release">2. Convocação / Liberação de Lote (Com botão PIX)</option>
-                  <option value="reminder">3. Último Aviso / Lembrete de Expiração</option>
-                  <option value="ticket">4. Ingresso Confirmado (Portaria)</option>
-                </select>
-              </div>
-
-              <div className="bg-[#0B0B0D] border border-[#1F1F24] p-3 text-[11px] text-[#8C8C9A] leading-relaxed">
-                💡 <strong className="text-[#E8E8EF]">Dica para nota 10/10:</strong> Gere um e-mail temporário no <a href="https://www.mail-tester.com" target="_blank" rel="noreferrer" className="text-[#8A3CFF] underline">mail-tester.com</a>, cole aqui e clique em enviar para auditar SPF, DKIM e conteúdo.
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSendingTestEmail}
-                className="w-full bg-[#8A3CFF] hover:bg-[#9a54ff] disabled:opacity-50 text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors"
-              >
-                {isSendingTestEmail ? (
-                  <span>DISPARANDO TESTE...</span>
-                ) : (
-                  <>
-                    <Mail className="w-4 h-4" />
-                    <span>ENVIAR E-MAIL DE TESTE</span>
-                  </>
+                {fallbackFeedback && (
+                  <div
+                    className={`mb-4 p-3 border text-xs leading-relaxed ${
+                      fallbackFeedback.type === 'success'
+                        ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                        : 'bg-red-950/40 border-red-500/50 text-red-300'
+                    }`}
+                  >
+                    <div>{fallbackFeedback.message}</div>
+                    {fallbackFeedback.resendId && (
+                      <div className="font-mono text-[10px] text-emerald-400/80 mt-1">
+                        ID Resend: {fallbackFeedback.resendId}
+                      </div>
+                    )}
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <form onSubmit={handleSendFallbackEmail} className="space-y-4 text-xs">
+                  {/* Busca rápida */}
+                  <div>
+                    <label className="block text-[10px] uppercase text-[#8C8C9A] mb-1">
+                      Buscar Registro:
+                    </label>
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-[#5B5B66] absolute left-2.5 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="Filtrar por nome, e-mail ou telefone..."
+                        value={fallbackSearch}
+                        onChange={(e) => setFallbackSearch(e.target.value)}
+                        className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] pl-8 pr-3 py-2 text-xs outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Lista de registros selecionáveis */}
+                  <div className="max-h-48 overflow-y-auto border border-[#1F1F24] bg-[#0B0B0D]">
+                    {leads
+                      .filter((l) => {
+                        if (!fallbackSearch) return true;
+                        const q = fallbackSearch.toLowerCase();
+                        return (
+                          l.name.toLowerCase().includes(q) ||
+                          l.email.toLowerCase().includes(q) ||
+                          l.phone.includes(q)
+                        );
+                      })
+                      .map((lead) => (
+                        <label
+                          key={lead.id}
+                          className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer border-b border-[#1F1F24] last:border-0 transition-colors ${
+                            fallbackSelectedRecord === lead.id
+                              ? 'bg-[#8A3CFF]/10 border-l-2 border-l-[#8A3CFF]'
+                              : 'hover:bg-[#1A1A20]'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="fallback-record"
+                            value={lead.id}
+                            checked={fallbackSelectedRecord === lead.id}
+                            onChange={() => setFallbackSelectedRecord(lead.id)}
+                            className="accent-[#8A3CFF] w-3.5 h-3.5 shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[#8A3CFF] text-[10px] font-mono">
+                                #{String(lead.queue_position).padStart(4, '0')}
+                              </span>
+                              <span className="text-[#E8E8EF] uppercase truncate text-[11px] font-bold">
+                                {lead.name}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-[#5B5B66] truncate">
+                              {lead.email} · {lead.phone}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-0.5 shrink-0">
+                            <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 ${
+                              lead.notification_status === 'sent'
+                                ? 'bg-[#8A3CFF] text-[#0B0B0D]'
+                                : 'bg-[#1F1F24] text-[#5B5B66]'
+                            }`}>
+                              {lead.notification_status === 'sent' ? 'Notif.' : 'Pend.'}
+                            </span>
+                            <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 ${
+                              lead.payment_status === 'approved'
+                                ? 'bg-emerald-500 text-[#0B0B0D]'
+                                : lead.payment_status === 'expired'
+                                ? 'bg-[#FF2E3B] text-white'
+                                : 'bg-[#1F1F24] text-[#5B5B66]'
+                            }`}>
+                              {lead.payment_status.toUpperCase()}
+                            </span>
+                          </div>
+                        </label>
+                      ))}
+                    {leads.filter((l) => {
+                      if (!fallbackSearch) return true;
+                      const q = fallbackSearch.toLowerCase();
+                      return l.name.toLowerCase().includes(q) || l.email.toLowerCase().includes(q) || l.phone.includes(q);
+                    }).length === 0 && (
+                      <div className="p-4 text-center text-[#5B5B66] text-[11px] uppercase">
+                        Nenhum registro encontrado
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Email destino */}
+                  <div>
+                    <label className="block text-[10px] uppercase text-[#8C8C9A] mb-1">
+                      E-mail Destino (alternativo):
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="email-alternativo@exemplo.com"
+                      value={fallbackEmail}
+                      onChange={(e) => setFallbackEmail(e.target.value)}
+                      className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none"
+                    />
+                  </div>
+
+                  {/* Template */}
+                  <div>
+                    <label className="block text-[10px] uppercase text-[#8C8C9A] mb-1">
+                      Modelo do E-mail:
+                    </label>
+                    <select
+                      value={fallbackTemplate}
+                      onChange={(e) => setFallbackTemplate(e.target.value as any)}
+                      className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none cursor-pointer"
+                    >
+                      <option value="confirmation">1. Confirmação de Entrada na Fila</option>
+                      <option value="release">2. Convocação / Liberação de Lote</option>
+                      <option value="reminder">3. Último Aviso / Lembrete</option>
+                      <option value="ticket">4. Ingresso Confirmado</option>
+                    </select>
+                  </div>
+
+                  {fallbackSelectedRecord && (
+                    <div className="bg-[#0B0B0D] border border-[#1F1F24] p-3 text-[11px] text-[#8C8C9A] leading-relaxed">
+                      ✅ Registro selecionado: <strong className="text-[#E8E8EF]">
+                        {leads.find((l) => l.id === fallbackSelectedRecord)?.name || '—'}
+                      </strong> (#{String(leads.find((l) => l.id === fallbackSelectedRecord)?.queue_position || 0).padStart(4, '0')})
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isSendingFallback || !fallbackSelectedRecord}
+                    className="w-full bg-[#FF2E3B] hover:bg-[#ff4a55] disabled:opacity-50 text-white font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors"
+                  >
+                    {isSendingFallback ? (
+                      <span>REENVIANDO...</span>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>REENVIAR E-MAIL</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}
