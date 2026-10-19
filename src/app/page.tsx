@@ -10,9 +10,10 @@ import { JoinQueueModal } from '@/components/JoinQueueModal';
 import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { Countdown } from '@/components/Countdown';
 import { Reveal } from '@/components/Reveal';
+import { ShareSiteQrModal } from '@/components/ShareSiteQrModal';
 import { QueueResponse } from '@/types/database';
 import { useCurrentLot, LotLabels } from '@/hooks/useCurrentLot';
-import { Check, ChevronDown, Lock, ArrowRight, ShieldCheck, Music, Eye, MapPin } from 'lucide-react';
+import { Check, ChevronDown, Lock, ArrowRight, ShieldCheck, Music, Eye, MapPin, QrCode } from 'lucide-react';
 
 import heroMask from '../../public/img/masquerade/hero-mask.png';
 import crowdUv from '../../public/img/masquerade/crowd-uv.jpg';
@@ -124,6 +125,7 @@ export default function Home() {
   const [ticketData, setTicketData] = useState<NonNullable<QueueResponse['data']> | null>(null);
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [isShareQrOpen, setIsShareQrOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab | null>(null);
   const lot = useCurrentLot();
   const isPaid = ticketData?.payment_status === 'approved';
@@ -636,6 +638,14 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <span>SEM MÁSCARA, SEM ENTRADA</span>
             <span>·</span>
+            <button
+              onClick={() => setIsShareQrOpen(true)}
+              className="text-[#5B5B66] hover:text-[#8A3CFF] flex items-center gap-1 transition-colors"
+            >
+              <QrCode className="w-3 h-3" />
+              <span>Compartilhar</span>
+            </button>
+            <span>·</span>
             <span className="normal-case">Fotos: Unsplash</span>
             <span>·</span>
             <Link
@@ -661,6 +671,8 @@ export default function Home() {
         onClose={() => setIsCheckModalOpen(false)}
         onFound={(data) => setTicketData(data)}
       />
+
+      <ShareSiteQrModal isOpen={isShareQrOpen} onClose={() => setIsShareQrOpen(false)} />
     </div>
   );
 }
