@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Camera, CheckCircle2, CircleAlert, Keyboard, ScanLine, X } from 'lucide-react';
+import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser';
 import { AdminNavTabs } from '@/components/AdminNavTabs';
 import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 
@@ -17,12 +18,6 @@ type CheckinResult = {
   ticket_code?: string;
   checkin_at?: string;
 };
-
-type BarcodeDetectorLike = {
-  detect(source: HTMLVideoElement): Promise<Array<{ rawValue: string }>>;
-};
-
-type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
 
 function useAdminPassword() {
   return useSyncExternalStore(
@@ -40,12 +35,13 @@ export default function CheckinPage() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const scanningRef = useRef(false);
+  const scannerControlsRef = useRef<IScannerControls | null>(null);
+  const scanConsumedRef = useRef(false);
 
   const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
+    scannerControlsRef.current?.stop();
+    scannerControlsRef.current = null;
+    scanConsumedRef.current = false;
     setCameraActive(false);
   }, []);
 
@@ -78,42 +74,29 @@ export default function CheckinPage() {
 
   const startCamera = async () => {
     setCameraError(null);
-    const BarcodeDetector = (window as typeof window & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
-    if (!BarcodeDetector) {
-      setCameraError('Este navegador não oferece leitura automática. Digite ou cole o código do ingresso.');
-      return;
-    }
-
+    setResult(null);
+    scanConsumedRef.current = false;
+    setCameraActive(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setCameraActive(true);
-      const detector = new BarcodeDetector({ formats: ['qr_code'] });
-      const scan = async () => {
-        if (!streamRef.current || !videoRef.current || scanningRef.current) return;
-        scanningRef.current = true;
-        try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes[0]?.rawValue) {
-            const value = codes[0].rawValue;
-            setTicketCode(value);
-            stopCamera();
-            await checkIn(value);
-            return;
-          }
-        } catch {
-          // A câmera pode ainda estar iniciando; tenta novamente no próximo ciclo.
-        } finally {
-          scanningRef.current = false;
+      if (!videoRef.current) throw new Error('Vídeo indisponível.');
+
+      const reader = new BrowserQRCodeReader();
+      scannerControlsRef.current = await reader.decodeFromConstraints(
+        { video: { facingMode: { ideal: 'environment' } }, audio: false },
+        videoRef.current,
+        (scanResult, _scanError, controls) => {
+          if (!scanResult || scanConsumedRef.current) return;
+          scanConsumedRef.current = true;
+          controls.stop();
+          scannerControlsRef.current = null;
+          setCameraActive(false);
+          const value = scanResult.getText();
+          setTicketCode(value);
+          void checkIn(value);
         }
-        if (streamRef.current) window.setTimeout(scan, 500);
-      };
-      void scan();
-    } catch {
+      );
+    } catch (error) {
+      console.error('[CHECK-IN] Falha ao abrir câmera:', error);
       setCameraError('Não foi possível acessar a câmera. Verifique a permissão e tente novamente.');
       stopCamera();
     }
@@ -125,7 +108,7 @@ export default function CheckinPage() {
     return (
       <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] flex items-center justify-center p-4">
         <div className="bg-[#141418] border border-[#1F1F24] p-8 max-w-sm w-full text-center shadow-2xl">
-          <span className="font-data text-[10px] uppercase text-[#8A3CFF] tracking-widest block mb-2">// AUTENTICAÇÃO NECESSÁRIA</span>
+          <span className="font-data text-[10px] uppercase text-[#8A3CFF] tracking-widest block mb-2">{'// AUTENTICAÇÃO NECESSÁRIA'}</span>
           <h1 className="font-persona text-3xl uppercase mb-4">ACESSO RESTRITO</h1>
           <p className="text-xs text-[#5B5B66] font-data mb-6">Faça login primeiro no painel principal.</p>
           <Link href="/admin" className="block bg-[#8A3CFF] text-[#0B0B0D] font-persona text-lg py-3 uppercase">Ir para o Login Admin →</Link>
@@ -144,7 +127,7 @@ export default function CheckinPage() {
           <Link href="/admin" className="p-1.5 bg-[#141418] border border-[#1F1F24] hover:border-[#8A3CFF] text-[#5B5B66] hover:text-[#E8E8EF]" title="Voltar"><ArrowLeft className="w-4 h-4" /></Link>
           <PersonaMaskIcon className="w-5 h-3.5" fillColor="#8A3CFF" />
           <div>
-            <h1 className="font-persona text-3xl uppercase tracking-tight">BAILE DA LAGOA <span className="text-[#8A3CFF]">// PORTARIA</span></h1>
+            <h1 className="font-persona text-3xl uppercase tracking-tight">BAILE DA LAGOA <span className="text-[#8A3CFF]">{'// PORTARIA'}</span></h1>
             <p className="font-data text-[10px] text-[#5B5B66] uppercase tracking-widest mt-0.5">VALIDAÇÃO DE INGRESSOS</p>
           </div>
         </div>
