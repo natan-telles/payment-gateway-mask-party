@@ -52,6 +52,15 @@ export default function CheckinPage() {
       const normalized = value.trim();
       if (!normalized || submitting) return;
 
+      if (normalized.startsWith('{')) {
+        setResult({
+          success: false,
+          status: 'pre_sale_qr',
+          error: 'Este é um QR Code de pré-venda, não um ingresso pago. Peça o QR Code enviado após a confirmação do pagamento.',
+        });
+        return;
+      }
+
       setSubmitting(true);
       setResult(null);
       try {
@@ -91,7 +100,6 @@ export default function CheckinPage() {
           scannerControlsRef.current = null;
           setCameraActive(false);
           const value = scanResult.getText();
-          setTicketCode(value);
           void checkIn(value);
         }
       );

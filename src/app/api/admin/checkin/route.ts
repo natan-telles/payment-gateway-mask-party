@@ -17,6 +17,12 @@ export async function POST(req: NextRequest) {
     if (typeof ticketCode !== 'string' || !ticketCode.trim()) {
       return NextResponse.json({ success: false, error: 'Informe o código do ingresso.' }, { status: 400 });
     }
+    if (ticketCode.trim().startsWith('{')) {
+      return NextResponse.json(
+        { success: false, status: 'pre_sale_qr', error: 'Este QR Code é da pré-venda, não de um ingresso confirmado.' },
+        { status: 400 }
+      );
+    }
 
     const { data, error } = await createAdminClient().rpc('check_in_ticket', {
       p_ticket_code: ticketCode,

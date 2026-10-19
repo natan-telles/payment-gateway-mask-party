@@ -14,6 +14,7 @@ interface TicketBadgeProps {
   createdAt: string;
   alreadyRegistered?: boolean;
   paid?: boolean;
+  ticketCode?: string | null;
   lotName?: string;
   onReset?: () => void;
 }
@@ -26,6 +27,7 @@ export function TicketBadge({
   createdAt,
   alreadyRegistered,
   paid = false,
+  ticketCode,
   lotName = DEFAULT_LOT.name,
   onReset,
 }: TicketBadgeProps) {
@@ -35,13 +37,17 @@ export function TicketBadge({
   const formattedPosition = String(queuePosition).padStart(4, '0');
 
   useEffect(() => {
-    const payload = JSON.stringify({
-      event: 'BAILE_DA_LAGOA_31.10',
-      pos: queuePosition,
-      phone,
-      email,
-      created: createdAt,
-    });
+    // Só ingresso pago recebe QR validável pela portaria. A inscrição na fila
+    // permanece apenas como identificação de pré-venda.
+    const payload = paid && ticketCode
+      ? ticketCode
+      : JSON.stringify({
+          event: 'BAILE_DA_LAGOA_31.10',
+          pos: queuePosition,
+          phone,
+          email,
+          created: createdAt,
+        });
 
     QRCode.toDataURL(payload, {
       width: 200,
@@ -53,7 +59,7 @@ export function TicketBadge({
     })
       .then(setQrDataUrl)
       .catch((err) => console.error('Erro ao gerar QR Code:', err));
-  }, [queuePosition, phone, email, createdAt]);
+  }, [queuePosition, phone, email, createdAt, paid, ticketCode]);
 
   const handleShare = () => {
     const shareText = `Garanti meu lugar no Baile da Lagoa (31.10 · SJC)! Posição #${queuePosition}. Entre na lista:`;
@@ -159,13 +165,13 @@ export function TicketBadge({
         <div className="p-5 text-center bg-[#0B0B0D]">
           <div className="inline-block p-2 bg-[#E8E8EF] border border-[#1F1F24]">
             {qrDataUrl ? (
-              <img src={qrDataUrl} alt="QR Code da Fila" className="w-36 h-36 mx-auto" />
+              <img src={qrDataUrl} alt={paid ? 'QR Code do ingresso' : 'QR Code da fila'} className="w-36 h-36 mx-auto" />
             ) : (
               <div className="w-36 h-36 bg-zinc-800 animate-pulse" />
             )}
           </div>
           <p className="font-data text-[9px] text-[#5B5B66] uppercase tracking-widest mt-2">
-            Código de identificação da pré-venda
+            {paid ? 'QR Code válido para entrada' : 'Código de identificação da pré-venda'}
           </p>
         </div>
 

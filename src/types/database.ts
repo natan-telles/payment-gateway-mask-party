@@ -80,6 +80,7 @@ export interface QueueResponse {
     created_at: string;
     already_registered?: boolean;
     payment_status?: PaymentStatus;
+    ticket_code?: string | null;
   };
   error?: string;
 }
