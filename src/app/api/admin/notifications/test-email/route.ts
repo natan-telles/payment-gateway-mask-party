@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       // Padrão: Confirmação de entrada na fila (template revisado antispam)
       result = await sendQueueConfirmationEmail({
         to,
-        name: 'Manuella Lima (Teste)',
+        name: 'Usuario (Teste)',
         queuePosition: 16,
         lotName: '1º Lote',
       });
