@@ -49,6 +49,68 @@ CREATE INDEX IF NOT EXISTS idx_waiting_queue_email ON public.waiting_queue (emai
 CREATE INDEX IF NOT EXISTS idx_waiting_queue_ticket_code ON public.waiting_queue (ticket_code);
 CREATE INDEX IF NOT EXISTS idx_waiting_queue_payment_status ON public.waiting_queue (payment_status);
 
+-- Check-in atômico: a linha do ingresso fica bloqueada enquanto é validada.
+-- Isso impede que duas portarias aprovem o mesmo QR Code ao mesmo tempo.
+CREATE OR REPLACE FUNCTION public.check_in_ticket(p_ticket_code TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_lead RECORD;
+    v_code TEXT;
+BEGIN
+    v_code := upper(trim(p_ticket_code));
+
+    IF v_code IS NULL OR v_code = '' THEN
+        RETURN jsonb_build_object('success', false, 'status', 'invalid', 'error', 'Código do ingresso é obrigatório.');
+    END IF;
+
+    SELECT id, name, ticket_code, payment_status, ticket_status, checkin_status, checkin_at
+    INTO v_lead
+    FROM public.waiting_queue
+    WHERE ticket_code = v_code
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'status', 'not_found', 'error', 'Ingresso não encontrado.');
+    END IF;
+
+    IF v_lead.payment_status <> 'approved' OR v_lead.ticket_status = 'cancelled' THEN
+        RETURN jsonb_build_object('success', false, 'status', 'not_eligible', 'error', 'Este ingresso não está autorizado para entrada.');
+    END IF;
+
+    IF v_lead.checkin_status OR v_lead.ticket_status = 'checked_in' THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'status', 'already_checked_in',
+            'error', 'Este ingresso já foi utilizado.',
+            'name', v_lead.name,
+            'ticket_code', v_lead.ticket_code,
+            'checkin_at', v_lead.checkin_at
+        );
+    END IF;
+
+    UPDATE public.waiting_queue
+    SET checkin_status = true,
+        checkin_at = now(),
+        ticket_status = 'checked_in'
+    WHERE id = v_lead.id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'status', 'checked_in',
+        'name', v_lead.name,
+        'ticket_code', v_lead.ticket_code,
+        'checkin_at', now()
+    );
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.check_in_ticket(TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.check_in_ticket(TEXT) TO service_role;
+
 -- 3. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.waiting_queue ENABLE ROW LEVEL SECURITY;
 
