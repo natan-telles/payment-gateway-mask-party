@@ -38,18 +38,19 @@ function getReleaseEmailHtml({
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Acesso Liberado · Baile da Lagoa 31.10</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #0B0B0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E8E8EF;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; padding: 30px 15px;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; padding: 14px 8px;">
     <tr>
       <td align="center">
         <!-- Container Principal -->
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #141418; border: 1px solid #1F1F24;">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #141418; border: 1px solid #1F1F24;">
           
           <!-- Header -->
           <tr>
-            <td style="padding: 24px; background-color: #8A3CFF; color: #0B0B0D;">
+            <td style="padding: 18px; background-color: #8A3CFF; color: #0B0B0D;">
               <table width="100%" border="0" cellspacing="0" cellpadding="0">
                 <tr>
                   <td>
@@ -72,23 +73,23 @@ function getReleaseEmailHtml({
 
           <!-- Corpo do E-mail -->
           <tr>
-            <td style="padding: 32px 24px;">
-              <p style="font-size: 13px; color: #8C8C9A; margin: 0 0 16px 0; font-family: monospace;">
+            <td style="padding: 22px 18px;">
+              <p style="font-size: 13px; color: #8C8C9A; margin: 0 0 14px 0; font-family: monospace;">
                 Olá, <strong style="color: #E8E8EF;">${name}</strong>
               </p>
 
-              <h2 style="font-size: 20px; font-weight: 900; color: #E8E8EF; margin: 0 0 20px 0; line-height: 1.3;">
+              <h2 style="font-size: 20px; font-weight: 900; color: #E8E8EF; margin: 0 0 16px 0; line-height: 1.3;">
                 Seu lugar no ${lotName} está liberado.
               </h2>
 
-              <!-- Posição da Lista -->
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; border: 1px solid #1F1F24; margin-bottom: 24px; text-align: center;">
+              <!-- Posição da Lista (Box compacto) -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; border: 1px solid #1F1F24; margin-bottom: 16px; text-align: center;">
                 <tr>
-                  <td style="padding: 20px;">
+                  <td style="padding: 12px 14px;">
                     <span style="font-size: 9px; font-family: monospace; text-transform: uppercase; color: #8C8C9A; letter-spacing: 2px; display: block;">
                       Seu número na pré-venda
                     </span>
-                    <div style="font-size: 48px; font-weight: 900; color: #8A3CFF; line-height: 1; margin: 8px 0;">
+                    <div style="font-size: 32px; font-weight: 900; color: #8A3CFF; line-height: 1.1; margin: 4px 0;">
                       #${formattedPos}
                     </div>
                     <span style="font-size: 10px; color: #8C8C9A; font-family: monospace;">
@@ -98,11 +99,11 @@ function getReleaseEmailHtml({
                 </tr>
               </table>
 
-              <!-- Regra de Pagamento & Expiração -->
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; border-left: 3px solid #8A3CFF; margin-bottom: 24px;">
+              <!-- Regra de Pagamento & Expiração (Box compacto) -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; border-left: 3px solid #8A3CFF; margin-bottom: 16px;">
                 <tr>
-                  <td style="padding: 12px 16px;">
-                    <div style="font-size: 12px; font-weight: 700; color: #E8E8EF; margin-bottom: 4px;">
+                  <td style="padding: 10px 14px;">
+                    <div style="font-size: 12px; font-weight: 700; color: #E8E8EF; margin-bottom: 3px;">
                       Prazo de pagamento via PIX: ${expirationHours} horas
                     </div>
                     <div style="font-size: 11px; color: #8C8C9A; line-height: 1.5; font-family: monospace;">
@@ -113,10 +114,10 @@ function getReleaseEmailHtml({
               </table>
 
               <!-- Botão CTA -->
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 28px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 18px;">
                 <tr>
                   <td align="center">
-                    <a href="${paymentUrl}" style="display: block; background-color: #FF2E3B; color: #ffffff; font-size: 14px; font-weight: 700; text-decoration: none; padding: 16px 24px; text-align: center; letter-spacing: 0.5px;">
+                    <a href="${paymentUrl}" style="display: block; background-color: #FF2E3B; color: #ffffff; font-size: 13px; font-weight: 700; text-decoration: none; padding: 13px 18px; text-align: center; letter-spacing: 0.5px;">
                       Garantir ingresso via PIX &rarr;
                     </a>
                   </td>
@@ -179,33 +180,34 @@ function getReminderEmailHtml({
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Último Aviso · Baile da Lagoa</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #0B0B0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E8E8EF;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; padding: 30px 15px;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; padding: 14px 8px;">
     <tr>
       <td align="center">
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #141418; border: 1px solid #1F1F24;">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #141418; border: 1px solid #1F1F24;">
           <tr>
-            <td style="padding: 24px; background-color: #0B0B0D; border-bottom: 2px solid #FF2E3B;">
+            <td style="padding: 18px; background-color: #0B0B0D; border-bottom: 2px solid #FF2E3B;">
               <span style="background-color: #FF2E3B; color: #ffffff; font-size: 10px; font-weight: 700; padding: 3px 6px; text-transform: uppercase; font-family: monospace;">
                 Último Aviso
               </span>
-              <div style="font-size: 22px; font-weight: 900; color: #E8E8EF; margin-top: 8px;">
+              <div style="font-size: 20px; font-weight: 900; color: #E8E8EF; margin-top: 6px;">
                 Seu lugar no ${lotName} vai expirar
               </div>
             </td>
           </tr>
           <tr>
-            <td style="padding: 28px 24px;">
-              <p style="font-size: 12px; color: #8C8C9A; font-family: monospace; line-height: 1.6; margin: 0 0 20px 0;">
+            <td style="padding: 22px 18px;">
+              <p style="font-size: 12px; color: #8C8C9A; font-family: monospace; line-height: 1.6; margin: 0 0 16px 0;">
                 Olá, ${name}. O prazo para pagamento do seu ingresso no ${lotName} do <strong>Baile da Lagoa</strong> (Posição #${formattedPos}) está nas últimas horas. Caso o PIX não seja confirmado, a vaga passa para o próximo da lista.
               </p>
 
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 18px;">
                 <tr>
                   <td align="center">
-                    <a href="${paymentUrl}" style="display: block; background-color: #FF2E3B; color: #ffffff; font-size: 14px; font-weight: 700; text-decoration: none; padding: 16px 24px; text-align: center; letter-spacing: 0.5px;">
+                    <a href="${paymentUrl}" style="display: block; background-color: #FF2E3B; color: #ffffff; font-size: 13px; font-weight: 700; text-decoration: none; padding: 13px 18px; text-align: center; letter-spacing: 0.5px;">
                       Concluir pagamento via PIX &rarr;
                     </a>
                   </td>
@@ -213,7 +215,7 @@ function getReminderEmailHtml({
               </table>
 
               <!-- Rodapé de Conformidade (Antispam) -->
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 1px solid #1F1F24; padding-top: 16px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 1px solid #1F1F24; padding-top: 14px;">
                 <tr>
                   <td style="font-size: 10px; color: #5B5B66; font-family: monospace; line-height: 1.4;">
                     Você está recebendo este e-mail porque se cadastrou na lista do Baile da Lagoa.<br>
@@ -249,6 +251,7 @@ function getConfirmationEmailHtml({
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lugar Reservado · Baile da Lagoa 31.10</title>
   </head>
   <body
@@ -259,7 +262,7 @@ function getConfirmationEmailHtml({
       border="0"
       cellspacing="0"
       cellpadding="0"
-      style="background-color: #0B0B0D; padding: 30px 15px;"
+      style="background-color: #0B0B0D; padding: 14px 8px;"
     >
       <tr>
         <td align="center">
@@ -268,11 +271,11 @@ function getConfirmationEmailHtml({
             border="0"
             cellspacing="0"
             cellpadding="0"
-            style="max-width: 540px; background-color: #141418; border: 1px solid #1F1F24;"
+            style="max-width: 480px; background-color: #141418; border: 1px solid #1F1F24;"
           >
             <!-- Header -->
             <tr>
-              <td style="padding: 24px; background-color: #8A3CFF; color: #0B0B0D;">
+              <td style="padding: 18px; background-color: #8A3CFF; color: #0B0B0D;">
                 <table width="100%" border="0" cellspacing="0" cellpadding="0">
                   <tr>
                     <td>
@@ -282,14 +285,14 @@ function getConfirmationEmailHtml({
                         A Noite das Máscaras · 31.10 · SJC
                       </div>
                       <div
-                        style="font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: -1px; margin-top: 4px;"
+                        style="font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: -1px; margin-top: 3px;"
                       >
                         Baile da Lagoa
                       </div>
                     </td>
                     <td align="right" style="vertical-align: top;">
                       <span
-                        style="background-color: #0B0B0D; color: #E8E8EF; font-size: 10px; font-weight: 700; padding: 4px 8px; text-transform: uppercase; font-family: monospace; display: inline-block;"
+                        style="background-color: #0B0B0D; color: #E8E8EF; font-size: 10px; font-weight: 700; padding: 3px 6px; text-transform: uppercase; font-family: monospace; display: inline-block;"
                       >
                         ${lotName}
                       </span>
@@ -301,35 +304,35 @@ function getConfirmationEmailHtml({
 
             <!-- Corpo -->
             <tr>
-              <td style="padding: 32px 24px;">
+              <td style="padding: 22px 18px;">
                 <p
-                  style="font-size: 13px; color: #8C8C9A; margin: 0 0 16px 0; font-family: monospace;"
+                  style="font-size: 13px; color: #8C8C9A; margin: 0 0 14px 0; font-family: monospace;"
                 >
                   Olá, <strong style="color: #E8E8EF;">${name}</strong>
                 </p>
 
                 <h2
-                  style="font-size: 20px; font-weight: 900; color: #E8E8EF; margin: 0 0 20px 0; line-height: 1.3;"
+                  style="font-size: 20px; font-weight: 900; color: #E8E8EF; margin: 0 0 16px 0; line-height: 1.3;"
                 >
                   Seu lugar na fila está confirmado.
                 </h2>
 
-                <!-- Posição da Lista -->
+                <!-- Posição da Lista (Box compacto) -->
                 <table
                   width="100%"
                   border="0"
                   cellspacing="0"
                   cellpadding="0"
-                  style="background-color: #0B0B0D; border: 1px solid #1F1F24; margin-bottom: 24px; text-align: center;"
+                  style="background-color: #0B0B0D; border: 1px solid #1F1F24; margin-bottom: 16px; text-align: center;"
                 >
                   <tr>
-                    <td style="padding: 20px;">
+                    <td style="padding: 12px 14px;">
                       <span
                         style="font-size: 9px; font-family: monospace; text-transform: uppercase; color: #8C8C9A; letter-spacing: 2px; display: block;"
                       >
                         Sua posição na fila
                       </span>
-                      <div style="font-size: 48px; font-weight: 900; color: #8A3CFF; line-height: 1; margin: 8px 0;">
+                      <div style="font-size: 32px; font-weight: 900; color: #8A3CFF; line-height: 1.1; margin: 4px 0;">
                         #${formattedPos}
                       </div>
                       <span style="font-size: 10px; color: #8C8C9A; font-family: monospace;">
@@ -339,25 +342,25 @@ function getConfirmationEmailHtml({
                   </tr>
                 </table>
 
-                <!-- Regra de Ouro -->
+                <!-- Regra de Ouro (Box compacto) -->
                 <table
                   width="100%"
                   border="0"
                   cellspacing="0"
                   cellpadding="0"
-                  style="background-color: #0B0B0D; border-left: 3px solid #FF2E3B; margin-bottom: 24px;"
+                  style="background-color: #0B0B0D; border-left: 3px solid #FF2E3B; margin-bottom: 16px;"
                 >
                   <tr>
-                    <td style="padding: 12px 16px;">
+                    <td style="padding: 10px 14px;">
                       <div
-                        style="font-size: 12px; font-weight: 700; color: #E8E8EF; margin-bottom: 4px;"
+                        style="font-size: 12px; font-weight: 700; color: #E8E8EF; margin-bottom: 3px;"
                       >
                         Uma festa. Uma regra.
                       </div>
                       <div style="font-size: 11px; color: #FF2E3B; font-weight: 700;">
                         Ninguém entra de cara limpa.
                       </div>
-                      <div style="font-size: 10px; color: #8C8C9A; font-family: monospace; margin-top: 4px;">
+                      <div style="font-size: 10px; color: #8C8C9A; font-family: monospace; margin-top: 3px;">
                         Qualquer máscara vale. O local é secreto até a liberação do bilhete.
                       </div>
                     </td>
@@ -365,14 +368,14 @@ function getConfirmationEmailHtml({
                 </table>
 
                 <p
-                  style="font-size: 11px; color: #8C8C9A; font-family: monospace; line-height: 1.6; margin: 0 0 24px 0;"
+                  style="font-size: 11px; color: #8C8C9A; font-family: monospace; line-height: 1.6; margin: 0 0 18px 0;"
                 >
                   Assim que a liberação do ${lotName} for autorizada para a sua posição, você receberá uma notificação direta
                   no WhatsApp e no e-mail com as instruções de acesso.
                 </p>
 
                 <!-- Rodapé de Conformidade (Antispam) -->
-                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 1px solid #1F1F24; padding-top: 16px;">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 1px solid #1F1F24; padding-top: 14px;">
                   <tr>
                     <td style="font-size: 10px; color: #5B5B66; font-family: monospace; line-height: 1.4;">
                       Você está recebendo este e-mail porque se cadastrou na lista do Baile da Lagoa.<br>
@@ -552,39 +555,40 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<Tick
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ingresso Confirmado · Baile da Lagoa</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #0B0B0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E8E8EF;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; padding: 30px 15px;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; padding: 14px 8px;">
     <tr>
       <td align="center">
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #141418; border: 1px solid #1F1F24;">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #141418; border: 1px solid #1F1F24;">
           <tr>
-            <td style="padding: 24px; background-color: #8A3CFF; color: #0B0B0D;">
+            <td style="padding: 18px; background-color: #8A3CFF; color: #0B0B0D;">
               <div style="font-size: 11px; font-family: monospace; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
                 A Noite das Máscaras · 31.10 · SJC
               </div>
-              <div style="font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: -1px; margin-top: 4px;">
+              <div style="font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: -1px; margin-top: 3px;">
                 Ingresso Confirmado
               </div>
             </td>
           </tr>
           <tr>
-            <td style="padding: 32px 24px;">
-              <p style="font-size: 13px; color: #8C8C9A; margin: 0 0 16px 0; font-family: monospace;">
+            <td style="padding: 22px 18px;">
+              <p style="font-size: 13px; color: #8C8C9A; margin: 0 0 14px 0; font-family: monospace;">
                 Olá, <strong style="color: #E8E8EF;">${name}</strong>
               </p>
-              <p style="font-size: 12px; color: #8C8C9A; font-family: monospace; line-height: 1.6; margin: 0 0 20px 0;">
+              <p style="font-size: 12px; color: #8C8C9A; font-family: monospace; line-height: 1.6; margin: 0 0 16px 0;">
                 Seu pagamento foi confirmado com sucesso. Apresente o código abaixo na portaria do <strong style="color: #E8E8EF;">Baile da Lagoa</strong>.
               </p>
 
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; border: 1px solid #1F1F24; margin-bottom: 24px; text-align: center;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; border: 1px solid #1F1F24; margin-bottom: 16px; text-align: center;">
                 <tr>
-                  <td style="padding: 20px;">
+                  <td style="padding: 12px 14px;">
                     <span style="font-size: 9px; font-family: monospace; text-transform: uppercase; color: #8C8C9A; letter-spacing: 2px; display: block;">
                       Código do Ingresso · ${lotName}
                     </span>
-                    <div style="font-size: 36px; font-weight: 900; color: #8A3CFF; line-height: 1; margin: 10px 0; font-family: monospace;">
+                    <div style="font-size: 28px; font-weight: 900; color: #8A3CFF; line-height: 1.1; margin: 6px 0; font-family: monospace;">
                       ${ticketCode}
                     </div>
                   </td>
@@ -593,11 +597,11 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<Tick
 
               ${
                 receiptUrl
-                  ? `<p style="font-size: 11px; font-family: monospace; margin: 0 0 24px 0;"><a href="${receiptUrl}" style="color: #8A3CFF; text-decoration: underline;">Ver comprovante de pagamento &rarr;</a></p>`
+                  ? `<p style="font-size: 11px; font-family: monospace; margin: 0 0 18px 0;"><a href="${receiptUrl}" style="color: #8A3CFF; text-decoration: underline;">Ver comprovante de pagamento &rarr;</a></p>`
                   : ''
               }
 
-              <div style="border-top: 1px solid #1F1F24; padding-top: 20px; font-size: 11px; color: #8C8C9A; line-height: 1.6; font-family: monospace; margin-bottom: 24px;">
+              <div style="border-top: 1px solid #1F1F24; padding-top: 16px; font-size: 11px; color: #8C8C9A; line-height: 1.6; font-family: monospace; margin-bottom: 18px;">
                 <strong style="color: #E8E8EF;">Instruções:</strong><br>
                 &bull; Sem máscara, sem entrada.<br>
                 &bull; Ingresso pessoal e intransferível.<br>
@@ -605,7 +609,7 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<Tick
               </div>
 
               <!-- Rodapé de Conformidade (Antispam) -->
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 1px solid #1F1F24; padding-top: 16px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-top: 1px solid #1F1F24; padding-top: 14px;">
                 <tr>
                   <td style="font-size: 10px; color: #5B5B66; font-family: monospace; line-height: 1.4;">
                     Você está recebendo este e-mail referente à sua compra no Baile da Lagoa.<br>
@@ -616,7 +620,7 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<Tick
             </td>
           </tr>
           <tr>
-            <td style="padding: 14px 24px; background-color: #0B0B0D; border-top: 1px solid #1F1F24; text-align: center; font-size: 9px; color: #5B5B66; font-family: monospace;">
+            <td style="padding: 12px 18px; background-color: #0B0B0D; border-top: 1px solid #1F1F24; text-align: center; font-size: 9px; color: #5B5B66; font-family: monospace;">
               Baile da Lagoa · 31.10 · SJC · Uma festa. Uma regra.
             </td>
           </tr>
