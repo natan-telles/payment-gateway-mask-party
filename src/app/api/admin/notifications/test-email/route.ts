@@ -93,7 +93,6 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const to = searchParams.get('to');
-  const templateType = searchParams.get('type') || 'confirmation';
 
   if (!to) {
     return NextResponse.json({
@@ -117,30 +116,4 @@ export async function GET(req: NextRequest) {
   });
 }
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const to = searchParams.get('to');
-  const templateType = searchParams.get('type') || 'confirmation';
-
-  if (!to) {
-    return NextResponse.json({
-      success: false,
-      message: 'Informe o parâmetro ?to=seu_email@dominio.com na URL para testar o envio',
-    });
-  }
-
-  const result = await sendQueueConfirmationEmail({
-    to,
-    name: 'Usuário de Teste',
-    queuePosition: 16,
-    lotName: '1º Lote',
-  });
-
-  return NextResponse.json({
-    success: result.success,
-    resendId: result.id,
-    simulated: result.simulated,
-    error: result.error,
-  });
-}
 
