@@ -53,6 +53,12 @@ export default function AdminPage() {
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [reminderFeedback, setReminderFeedback] = useState<string | null>(null);
 
+  const [isTestEmailModalOpen, setIsTestEmailModalOpen] = useState(false);
+  const [testEmailTo, setTestEmailTo] = useState('');
+  const [testEmailTemplate, setTestEmailTemplate] = useState<'confirmation' | 'release' | 'reminder' | 'ticket'>('confirmation');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailFeedback, setTestEmailFeedback] = useState<{ type: 'success' | 'error'; message: string; resendId?: string } | null>(null);
+
   useEffect(() => {
     const saved = sessionStorage.getItem('mask_party_admin_pw');
     if (saved) {
@@ -296,6 +302,54 @@ export default function AdminPage() {
     }
   };
 
+  const handleSendTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testEmailTo || !testEmailTo.includes('@')) {
+      setTestEmailFeedback({ type: 'error', message: 'Digite um e-mail válido para o teste.' });
+      return;
+    }
+
+    setIsSendingTestEmail(true);
+    setTestEmailFeedback(null);
+
+    try {
+      const res = await fetch('/api/admin/notifications/test-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': password,
+        },
+        body: JSON.stringify({
+          to: testEmailTo,
+          templateType: testEmailTemplate,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const mode = data.simulated ? ' (Modo Simulação local)' : ' (Resend Real via API)';
+        setTestEmailFeedback({
+          type: 'success',
+          message: `E-mail enviado com sucesso para ${testEmailTo}${mode}!`,
+          resendId: data.resendId,
+        });
+      } else {
+        setTestEmailFeedback({
+          type: 'error',
+          message: data.error || 'Falha ao enviar e-mail de teste.',
+        });
+      }
+    } catch {
+      setTestEmailFeedback({
+        type: 'error',
+        message: 'Erro de conexão com o servidor ao disparar o e-mail de teste.',
+      });
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] flex flex-col items-center justify-center p-4">
@@ -471,6 +525,17 @@ export default function AdminPage() {
             >
               <Clock className="w-3.5 h-3.5 text-[#8A3CFF]" />
               <span>Lembretes ({metrics.pendingPaymentCount})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setTestEmailFeedback(null);
+                setIsTestEmailModalOpen(true);
+              }}
+              className="bg-[#141418] hover:bg-[#1f1f24] text-[#E8E8EF] py-2.5 px-3.5 uppercase text-xs tracking-wider border border-[#1F1F24] hover:border-[#8A3CFF]/50 flex items-center gap-1.5 transition-colors"
+            >
+              <Mail className="w-3.5 h-3.5 text-[#8A3CFF]" />
+              <span>E-mail de Teste</span>
             </button>
           </div>
         </div>
@@ -743,6 +808,98 @@ export default function AdminPage() {
                   <>
                     <Send className="w-4 h-4" />
                     <span>CONFIRMAR DISPARO</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE E-MAIL DE TESTE */}
+      {isTestEmailModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#141418] border border-[#1F1F24] max-w-md w-full p-6 relative font-data">
+            <button
+              onClick={() => setIsTestEmailModalOpen(false)}
+              className="absolute top-4 right-4 text-[#5B5B66] hover:text-[#E8E8EF] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <span className="text-[9px] uppercase text-[#8A3CFF] tracking-widest block mb-1">
+              // DIAGNÓSTICO & ENTREGABILIDADE
+            </span>
+            <h3 className="font-persona text-2xl uppercase tracking-tight mb-2">
+              DISPARAR E-MAIL DE TESTE
+            </h3>
+            <p className="text-xs text-[#8C8C9A] mb-4">
+              Envie um e-mail com a formatação antispam para seu endereço ou para o <strong>Mail-Tester</strong> para auditar a nota antes de liberar lotes.
+            </p>
+
+            {testEmailFeedback && (
+              <div
+                className={`mb-4 p-3 border text-xs leading-relaxed ${
+                  testEmailFeedback.type === 'success'
+                    ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                    : 'bg-red-950/40 border-red-500/50 text-red-300'
+                }`}
+              >
+                <div>{testEmailFeedback.message}</div>
+                {testEmailFeedback.resendId && (
+                  <div className="font-mono text-[10px] text-emerald-400/80 mt-1">
+                    ID Resend: {testEmailFeedback.resendId}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <form onSubmit={handleSendTestEmail} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] uppercase text-[#8C8C9A] mb-1">
+                  E-mail Destinatário:
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="exemplo@gmail.com ou test-xxx@mail-tester.com"
+                  value={testEmailTo}
+                  onChange={(e) => setTestEmailTo(e.target.value)}
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase text-[#8C8C9A] mb-1">
+                  Modelo do Template:
+                </label>
+                <select
+                  value={testEmailTemplate}
+                  onChange={(e) => setTestEmailTemplate(e.target.value as any)}
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none cursor-pointer"
+                >
+                  <option value="confirmation">1. Confirmação de Entrada na Fila (Template Antispam)</option>
+                  <option value="release">2. Convocação / Liberação de Lote (Com botão PIX)</option>
+                  <option value="reminder">3. Último Aviso / Lembrete de Expiração</option>
+                  <option value="ticket">4. Ingresso Confirmado (Portaria)</option>
+                </select>
+              </div>
+
+              <div className="bg-[#0B0B0D] border border-[#1F1F24] p-3 text-[11px] text-[#8C8C9A] leading-relaxed">
+                💡 <strong className="text-[#E8E8EF]">Dica para nota 10/10:</strong> Gere um e-mail temporário no <a href="https://www.mail-tester.com" target="_blank" rel="noreferrer" className="text-[#8A3CFF] underline">mail-tester.com</a>, cole aqui e clique em enviar para auditar SPF, DKIM e conteúdo.
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSendingTestEmail}
+                className="w-full bg-[#8A3CFF] hover:bg-[#9a54ff] disabled:opacity-50 text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors"
+              >
+                {isSendingTestEmail ? (
+                  <span>DISPARANDO TESTE...</span>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    <span>ENVIAR E-MAIL DE TESTE</span>
                   </>
                 )}
               </button>
