@@ -363,6 +363,7 @@ export default function Home() {
                   createdAt={ticketData.created_at}
                   alreadyRegistered={ticketData.already_registered}
                   paid={isPaid}
+                  ticketCode={ticketData.ticket_code}
                   lotName={lot.name}
                   onReset={() => setTicketData(null)}
                 />

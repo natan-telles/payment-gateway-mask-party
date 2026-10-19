@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         // Verifica duplicidade
         const { data: existing } = await supabase
           .from('waiting_queue')
-          .select('id, queue_position, name, phone, email, created_at, payment_status')
+          .select('id, queue_position, name, phone, email, created_at, payment_status, ticket_code')
           .or(`phone.eq.${cleanPhone},email.eq.${cleanEmail}`)
           .maybeSingle();
 
@@ -219,7 +219,7 @@ export async function GET(req: NextRequest) {
       const supabase = createAdminClient();
       const { data, error } = await supabase
         .from('waiting_queue')
-        .select('id, queue_position, name, phone, email, created_at, payment_status, ticket_status')
+        .select('id, queue_position, name, phone, email, created_at, payment_status, ticket_status, ticket_code')
         .or(`phone.eq.${cleanQuery},email.eq.${cleanQuery}`)
         .maybeSingle();
 
