@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAppUrl } from '@/lib/app-url';
 import { sendTicketEmail } from '@/lib/notifications/email';
+import { logNotification } from '@/lib/notifications/log';
 import { getOrderLotLabels } from '@/lib/lots/server';
 import { getPaymentProvider } from '.';
 import { PaymentProvider, PaymentReference } from './types';
@@ -30,6 +31,7 @@ export interface ConfirmResult {
   status: ConfirmStatus;
   ticketCode?: string | null;
   issued?: {
+    leadId: string | null;
     name: string;
     email: string;
     lotName: string;
@@ -65,7 +67,7 @@ export async function confirmOrderPayment(
 
   const { data: order, error: orderError } = await supabase
     .from('payment_orders')
-    .select('id, amount_cents')
+    .select('id, amount_cents, lead_id')
     .eq('id', orderId)
     .maybeSingle();
 
@@ -118,6 +120,7 @@ export async function confirmOrderPayment(
     status: 'confirmed',
     ticketCode: result.ticket_code,
     issued: {
+      leadId: order.lead_id ?? null,
       name: result.lead_name,
       email: result.lead_email,
       lotName: lot?.name ?? result.lot_name,
@@ -161,9 +164,20 @@ export async function notifyTicketIssued(result: ConfirmResult) {
     ticketCode: result.ticketCode,
     lotName: result.issued.lotName,
     receiptUrl: result.issued.receiptUrl,
+    leadId: result.issued.leadId,
   });
 
   if (!emailRes.success) {
+    // O ingresso já está emitido no banco; só o e-mail falhou. O admin reenvia pela aba Logs / Reenviar.
     console.error(`[PAGAMENTO] Falha ao enviar ingresso ${result.ticketCode} para ${result.issued.email}`);
+    await logNotification({
+      level: 'error',
+      kind: 'ticket',
+      message: `PAGAMENTO CONFIRMADO mas o ingresso ${result.ticketCode} NÃO chegou para ${result.issued.name} (${result.issued.email}). Reenvie manualmente pelo painel.`,
+      email: result.issued.email,
+      leadId: result.issued.leadId,
+      errorCode: emailRes.errorCode ?? 'send_failed',
+      meta: { ticketCode: result.ticketCode, quotaExceeded: emailRes.quotaExceeded },
+    });
   }
 }

@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
             to: cleanEmail,
             name: name.trim(),
             queuePosition: Number(inserted.queue_position),
+            leadId: inserted.id,
           })).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
         }
 
@@ -127,6 +128,7 @@ export async function POST(req: NextRequest) {
           to: rpcResult.email,
           name: rpcResult.name,
           queuePosition: Number(rpcResult.queue_position),
+          leadId: rpcResult.id,
         })).catch((e) => console.error('Erro ao enviar e-mail de confirmação:', e));
       }
 

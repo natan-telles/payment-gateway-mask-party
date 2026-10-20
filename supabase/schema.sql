@@ -477,3 +477,26 @@ GRANT EXECUTE ON FUNCTION public.confirm_payment(UUID, TEXT, INTEGER, TEXT, TEXT
 --   ('1º LOTE', 1, 5000, 200, '2026-10-20 23:59:59-03'),
 --   ('2º LOTE', 2, 7000, 300, '2026-10-27 23:59:59-03'),
 --   ('3º LOTE', 3, 9000, 200, NULL);
+
+-- ============================================================
+-- 6. LOGS DE NOTIFICAÇÃO (auditoria de e-mails e cota do Resend)
+-- Grava erros de envio, bloqueios por cota e resumos de disparos em lote.
+-- O painel /admin/logs lê esta tabela.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.notification_logs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+    level TEXT NOT NULL CHECK (level IN ('info', 'warn', 'error')),
+    kind TEXT NOT NULL,                 -- confirmation | release | reminder | ticket | test | batch | usage
+    message TEXT NOT NULL,
+    email TEXT,
+    lead_id UUID REFERENCES public.waiting_queue(id) ON DELETE SET NULL,
+    error_code TEXT,                    -- ex.: daily_quota_exceeded
+    meta JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_logs_created_at ON public.notification_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notification_logs_level ON public.notification_logs (level);
+
+-- Somente o Service Role (API do site) lê e escreve
+ALTER TABLE public.notification_logs ENABLE ROW LEVEL SECURITY;
