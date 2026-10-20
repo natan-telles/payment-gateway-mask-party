@@ -230,7 +230,7 @@ export default function AdminPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `baile-persona-fila-${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `baile-da-lagoa-fila-${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -241,7 +241,7 @@ export default function AdminPage() {
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
     const text = encodeURIComponent(
-      `Olá, ${lead.name.split(' ')[0]}!\n\nSua prioridade na fila do *BAILE PERSONA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).\n\nSeu acesso para compra de ingresso no ${lot.name} está liberado por tempo limitado.\n\nLink de compra: ${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`
+      `Olá, ${lead.name.split(' ')[0]}!\n\nSua prioridade na fila do *BAILE DA LAGOA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).\n\nSeu acesso para compra de ingresso no ${lot.name} está liberado por tempo limitado.\n\nLink de compra: ${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`
     );
 
     const waUrl = `https://wa.me/${phoneWithDDI}?text=${text}`;
@@ -426,7 +426,7 @@ export default function AdminPage() {
             ADMIN DASHBOARD
           </h1>
           <p className="text-xs text-[#5B5B66] mb-6 font-data">
-            Baile Persona · Controle de Fila e Ingressos
+            Baile da Lagoa · Controle de Fila e Ingressos
           </p>
 
           {authError && (
@@ -484,7 +484,7 @@ export default function AdminPage() {
               <div className="flex items-center gap-2">
                 <PersonaMaskIcon className="w-5 h-3.5" fillColor="#8A3CFF" />
                 <span className="font-persona text-3xl uppercase tracking-tight text-[#E8E8EF]">
-                  BAILE PERSONA <span className="text-[#8A3CFF]">// ADMIN</span>
+                  BAILE DA LAGOA <span className="text-[#8A3CFF]">// ADMIN</span>
                 </span>
               </div>
             </div>
