@@ -43,22 +43,22 @@ export function EventBranding() {
           </div>
         </div>
 
-        {/* Card 2: Local Secreto */}
+        {/* Card 2: Local */}
         <div className="bg-zinc-950 border-2 border-zinc-800 p-6 md:p-8 hover:border-yellow-ascend transition-colors relative group">
           <div className="w-12 h-12 bg-black border border-zinc-700 flex items-center justify-center mb-6 text-yellow-ascend group-hover:bg-yellow-ascend group-hover:text-black transition-colors">
             <MapPin className="w-6 h-6" />
           </div>
           <span className="text-[10px] font-mono uppercase text-zinc-500 block mb-1">
-            SECRET VENUE
+            VENUE
           </span>
           <h3 className="ascend-font text-2xl uppercase tracking-wide text-white mb-3">
-            LOCALIZAÇÃO SECRETA
+            O LOCAL
           </h3>
           <p className="text-xs text-zinc-400 font-sans leading-relaxed mb-4">
-            Espaço industrial exclusivo na capital com cenografia visual imersiva e acoustics de alta fidelidade. O endereço exato é revelado via WhatsApp exclusivamente para quem concluir o pagamento do ingresso.
+            Av. Gen. Motors, 1159 - Ronda, São José dos Campos - SP, 12221-842. Cenografia visual imersiva e som de alta fidelidade.
           </p>
           <div className="inline-block bg-zinc-800 text-zinc-300 font-bold text-[10px] px-2 py-0.5 uppercase font-mono">
-            REVELADO APÓS PAGAMENTO
+            SÃO JOSÉ DOS CAMPOS · SP
           </div>
         </div>
 

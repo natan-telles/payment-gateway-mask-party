@@ -1,28 +1,28 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import Image, { StaticImageData } from 'next/image';
-import { Navbar } from '@/components/Navbar';
-import { TicketBadge } from '@/components/TicketBadge';
 import { CheckStatusModal } from '@/components/CheckStatusModal';
-import { JoinQueueModal } from '@/components/JoinQueueModal';
-import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { Countdown } from '@/components/Countdown';
+import { JoinQueueModal } from '@/components/JoinQueueModal';
+import { Navbar } from '@/components/Navbar';
+import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { Reveal } from '@/components/Reveal';
 import { ShareSiteQrModal } from '@/components/ShareSiteQrModal';
+import { TicketBadge } from '@/components/TicketBadge';
+import { LotLabels, useCurrentLot } from '@/hooks/useCurrentLot';
 import { QueueResponse } from '@/types/database';
-import { useCurrentLot, LotLabels } from '@/hooks/useCurrentLot';
-import { Check, ChevronDown, Lock, ArrowRight, ShieldCheck, Music, Eye, MapPin, QrCode } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Eye, Lock, MapPin, Music, QrCode, ShieldCheck } from 'lucide-react';
+import Image, { StaticImageData } from 'next/image';
+import Link from 'next/link';
+import React, { useEffect, useRef, useState } from 'react';
 
-import heroMask from '../../public/img/masquerade/hero-mask.png';
-import crowdUv from '../../public/img/masquerade/crowd-uv.jpg';
 import crowdRed from '../../public/img/masquerade/crowd-red.jpg';
 import crowdStage from '../../public/img/masquerade/crowd-stage.jpg';
-import masksRow from '../../public/img/masquerade/masks-row.jpg';
-import maskRed from '../../public/img/masquerade/mask-red.jpg';
+import crowdUv from '../../public/img/masquerade/crowd-uv.jpg';
+import heroMask from '../../public/img/masquerade/hero-mask.png';
 import maskDrink from '../../public/img/masquerade/mask-drink.jpg';
+import maskRed from '../../public/img/masquerade/mask-red.jpg';
 import maskedParty from '../../public/img/masquerade/masked-party.jpg';
+import masksRow from '../../public/img/masquerade/masks-row.jpg';
 
 type Tab = 'info' | 'regras' | 'faq';
 
@@ -44,7 +44,7 @@ const EXPERIENCE: Array<{
     index: '01',
     label: 'O SOM',
     title: 'DJ SET ATÉ 05H',
-    text: 'House, Melodic e Dark Disco a noite inteira. Bar aberto do começo ao fim.',
+    text: 'House, Melodic e Dark Disco a noite inteira. Bar sem álcool com 1 drink incluso no ingresso.',
   },
   {
     img: maskedParty,
@@ -61,13 +61,13 @@ const EXPERIENCE: Array<{
     icon: MapPin,
     index: '03',
     label: 'O LOCAL',
-    title: 'ENDEREÇO SECRETO',
-    text: 'Local secreto em São José dos Campos, revelado só no bilhete oficial.',
+    title: 'ENDEREÇO',
+    text: 'Av. Gen. Motors, 1159 - Ronda, São José dos Campos - SP, 12221-842',
     tone: 'red',
   },
 ];
 
-const buildMarquee = (lot: LotLabels) => ['SEM MÁSCARA, SEM ENTRADA', '31.10', 'SJC', lot.code, 'OPEN BAR', 'DJ SET ATÉ 05H', 'LOCAL SECRETO'];
+const buildMarquee = (lot: LotLabels) => ['SEM MÁSCARA, SEM ENTRADA', '31.10', 'SJC', lot.code, '1 DRINK INCLUSO', 'DJ SET ATÉ 05H'];
 
 const buildGuide = (lot: LotLabels): Array<{ id: Tab; title: string; accent: string; content: React.ReactNode }> => [
   {
@@ -77,9 +77,9 @@ const buildGuide = (lot: LotLabels): Array<{ id: Tab; title: string; accent: str
     content: (
       <>
         <p>· DJ set até de madrugada (House, Melodic, Dark Disco).</p>
-        <p>· Bar aberto a noite toda.</p>
+        <p>· Bar sem álcool: o ingresso inclui 1 drink.</p>
         <p>· Máscara obrigatória durante todo o evento.</p>
-        <p>· Local secreto em São José dos Campos revelado no bilhete oficial.</p>
+        <p>· Local: Av. Gen. Motors, 1159 - Ronda, São José dos Campos - SP, 12221-842.</p>
       </>
     ),
   },
@@ -198,7 +198,7 @@ export default function Home() {
           {/* Marcas de flyer nos cantos */}
           <div className="hidden md:block absolute top-6 right-6 font-data text-[9px] text-[#5B5B66] uppercase tracking-widest text-right">
             <span className="block">23°11&apos;S · 45°53&apos;W</span>
-            <span className="block text-[#8A3CFF]">LOC: SECRETO</span>
+            <span className="block text-[#8A3CFF]">LOC: AV. GEN. MOTORS, 1159 · RONDA</span>
           </div>
           <div className="hidden md:block absolute bottom-6 right-6 font-data text-[9px] text-[#5B5B66] uppercase tracking-widest">
             ED. ANUAL // Nº 01
@@ -310,7 +310,7 @@ export default function Home() {
               {/* Pílulas em formato de canhoto de ingresso */}
               <div className="grid grid-cols-3 gap-2 font-data text-[10px] uppercase text-[#E8E8EF] mb-10">
                 {[
-                  { label: 'OPEN BAR', value: 'NOITE TODA', color: 'text-[#8A3CFF] font-bold' },
+                  { label: 'BAR', value: '1 DRINK INCLUSO', color: 'text-[#8A3CFF] font-bold' },
                   { label: 'SOM', value: 'DJ SET ATÉ 05H', color: '' },
                   { label: 'ACESSO', value: isPaid ? 'PAGO' : lot.name, color: 'text-[#FF2E3B] font-bold' },
                 ].map((pill) => (
@@ -330,7 +330,7 @@ export default function Home() {
                 {[
                   ['ENTRE NA FILA', 'Cadastro gratuito, leva menos de um minuto.'],
                   ['RECEBA A LIBERAÇÃO', 'Chave PIX exclusiva no WhatsApp e no e-mail.'],
-                  ['PAGUE NO PRAZO', 'Bilhete oficial com o local secreto revelado.'],
+                  ['PAGUE NO PRAZO', 'Bilhete oficial com local e dresscode.'],
                 ].map(([title, text], i) => {
                   // Na fila: etapa 1 cumprida. Pago: todas cumpridas
                   const done = isPaid || (Boolean(ticketData) && i === 0);
@@ -645,8 +645,6 @@ export default function Home() {
               <QrCode className="w-3 h-3" />
               <span>Compartilhar</span>
             </button>
-            <span>·</span>
-            <span className="normal-case">Fotos: Unsplash</span>
             <span>·</span>
             <Link
               href="/admin"
