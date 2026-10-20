@@ -130,7 +130,7 @@ function getReleaseEmailHtml({
                 &bull; Sem máscara, sem entrada.<br>
                 &bull; Qualquer máscara vale: veneziana, moderna ou avant-garde.<br>
                 &bull; Paleta recomendada: All Black.<br>
-                &bull; Local exato em SJC revelado após confirmação do ingresso.
+                &bull; Local: Av. Gen. Motors, 1159 - Ronda, São José dos Campos - SP, 12221-842.
               </div>
 
               <!-- Rodapé de Conformidade (Antispam) -->
@@ -361,7 +361,7 @@ function getConfirmationEmailHtml({
                         Ninguém entra de cara limpa.
                       </div>
                       <div style="font-size: 10px; color: #8C8C9A; font-family: monospace; margin-top: 3px;">
-                        Qualquer máscara vale. O local é secreto até a liberação do bilhete.
+                        Qualquer máscara vale. Local: Av. Gen. Motors, 1159 - Ronda, SJC.
                       </div>
                     </td>
                   </tr>
@@ -605,7 +605,7 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<Tick
                 <strong style="color: #E8E8EF;">Instruções:</strong><br>
                 &bull; Sem máscara, sem entrada.<br>
                 &bull; Ingresso pessoal e intransferível.<br>
-                &bull; O local exato em SJC será enviado aos portadores de ingresso.
+                &bull; Local: Av. Gen. Motors, 1159 - Ronda, São José dos Campos - SP, 12221-842.
               </div>
 
               <!-- Rodapé de Conformidade (Antispam) -->
