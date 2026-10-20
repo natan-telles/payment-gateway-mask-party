@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAppUrl } from '@/lib/app-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendQueueReleaseEmail } from '@/lib/notifications/email';
+import { logNotification } from '@/lib/notifications/log';
+import { getResendUsage, emailsRemaining, describeUsage } from '@/lib/notifications/usage';
 import { getCurrentLotLabels } from '@/lib/lots/server';
 import { DEFAULT_LOT } from '@/lib/lots/labels';
 
@@ -17,8 +19,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { count = 10, expirationHours = 12 } = await req.json();
-    const batchSize = Math.max(1, Math.min(Number(count) || 10, 100));
+    const {
+      count = 10,
+      expirationHours = 12,
+      // true = usa toda a cota restante; false (padrão) = guarda metade para os e-mails de ingresso
+      ignoreTicketReserve = false,
+    } = await req.json();
+    const requested = Math.max(1, Math.min(Number(count) || 10, 100));
 
     const hasSupabase =
       Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
@@ -30,6 +37,43 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Supabase não está configurado.' },
         { status: 500 }
       );
+    }
+
+    // 0. TRAVA DE COTA: consulta o uso do Resend antes de disparar qualquer e-mail.
+    // Cada pessoa liberada que pagar ainda vai receber o e-mail do ingresso, então,
+    // por padrão, só metade da cota restante é usada na liberação.
+    const usage = await getResendUsage();
+    const remaining = emailsRemaining(usage);
+    const usageSummary = describeUsage(usage);
+    const warnings: string[] = [];
+    let batchSize = requested;
+
+    if (remaining !== null) {
+      const allowed = ignoreTicketReserve ? remaining : Math.floor(remaining / 2);
+
+      if (allowed <= 0) {
+        const message = ignoreTicketReserve
+          ? `Cota do Resend esgotada (${usageSummary}). Nenhum e-mail foi disparado; a fila permanece intacta.`
+          : `Cota do Resend insuficiente (${usageSummary}): restam ${remaining} e-mail(s) e cada liberação precisa de margem para o ingresso. Nenhum e-mail foi disparado.`;
+        await logNotification({
+          level: 'warn',
+          kind: 'batch',
+          message: `Liberação de lote bloqueada pela trava de cota. Pedido: ${requested}. ${usageSummary}`,
+          errorCode: 'quota_guard',
+          meta: { requested, remaining, ignoreTicketReserve },
+        });
+        return NextResponse.json({ success: false, error: message, usage: usageSummary, remaining }, { status: 429 });
+      }
+
+      if (allowed < requested) {
+        batchSize = allowed;
+        warnings.push(
+          `Lote reduzido de ${requested} para ${batchSize}: restam ${remaining} e-mail(s) na cota (${usageSummary})` +
+            (ignoreTicketReserve ? '.' : ' e metade fica reservada para os e-mails de ingresso.')
+        );
+      }
+    } else if (!usage.available) {
+      warnings.push(`Não foi possível consultar a cota do Resend (${usage.reason}). O lote segue sem trava.`);
     }
 
     const supabase = createAdminClient();
@@ -51,6 +95,8 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Nenhum participante pendente de notificação na fila.',
         releasedCount: 0,
+        warnings,
+        usage: usageSummary,
       });
     }
 
@@ -59,9 +105,17 @@ export async function POST(req: NextRequest) {
     const lot = await getCurrentLotLabels().catch(() => DEFAULT_LOT);
     const results = [];
     const idsToUpdate: string[] = [];
+    let failedCount = 0;
+    let quotaHit = false;
+    let skippedCount = 0;
 
     // 2. Disparar e-mail de liberação para cada participante
     for (const lead of leads) {
+      if (quotaHit) {
+        skippedCount += 1;
+        continue;
+      }
+
       const paymentUrl = `${appUrl}/checkout/${lead.id}`;
       const emailRes = await sendQueueReleaseEmail({
         to: lead.email,
@@ -70,6 +124,7 @@ export async function POST(req: NextRequest) {
         paymentUrl,
         lotName: lot.name,
         expirationHours,
+        leadId: lead.id,
       });
 
       results.push({
@@ -79,10 +134,15 @@ export async function POST(req: NextRequest) {
         queuePosition: lead.queue_position,
         success: emailRes.success,
         simulated: emailRes.simulated,
+        error: emailRes.error,
       });
 
       if (emailRes.success) {
         idsToUpdate.push(lead.id);
+      } else {
+        failedCount += 1;
+        // Cota estourou no meio do lote: para na hora, quem não recebeu continua 'pending'
+        if (emailRes.quotaExceeded) quotaHit = true;
       }
     }
 
@@ -99,16 +159,53 @@ export async function POST(req: NextRequest) {
 
       if (updateError) {
         console.error('Erro ao atualizar status de notificação no banco:', updateError);
+        await logNotification({
+          level: 'error',
+          kind: 'batch',
+          message: `E-mails enviados, mas falhou ao marcar ${idsToUpdate.length} lead(s) como notificado(s): ${updateError.message}`,
+          errorCode: 'db_update_failed',
+          meta: { ids: idsToUpdate },
+        });
       }
     }
+
+    if (quotaHit) {
+      warnings.push(
+        `A cota do Resend esgotou durante o disparo: ${idsToUpdate.length} liberado(s), ${skippedCount + failedCount} continuam na fila como pendentes.`
+      );
+    } else if (failedCount > 0) {
+      warnings.push(`${failedCount} e-mail(s) falharam e continuam pendentes. Veja a aba Logs.`);
+    }
+
+    // 4. Resumo do disparo no log
+    await logNotification({
+      level: quotaHit || failedCount > 0 ? 'warn' : 'info',
+      kind: 'batch',
+      message: `Liberação de lote: ${idsToUpdate.length} enviado(s), ${failedCount} falha(s), ${skippedCount} não tentado(s). Pedido: ${requested}, lote: ${batchSize}. Cota: ${usageSummary}`,
+      errorCode: quotaHit ? 'daily_quota_exceeded' : null,
+      meta: { requested, batchSize, expirationHours, remainingBefore: remaining, ignoreTicketReserve, lot: lot.name },
+    });
 
     return NextResponse.json({
       success: true,
       releasedCount: idsToUpdate.length,
+      failedCount,
+      skippedCount,
+      quotaHit,
+      requested,
+      batchSize,
+      warnings,
+      usage: usageSummary,
       simulated: results[0]?.simulated ?? false,
       results,
     });
   } catch (err: any) {
+    await logNotification({
+      level: 'error',
+      kind: 'batch',
+      message: `Erro inesperado na liberação de lote: ${err?.message || 'desconhecido'}`,
+      errorCode: 'exception',
+    });
     return NextResponse.json(
       { success: false, error: err.message || 'Erro ao processar liberação de lote' },
       { status: 500 }

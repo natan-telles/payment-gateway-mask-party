@@ -2,10 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ListOrdered, BarChart3, Ticket, ScanLine } from 'lucide-react';
+import { ListOrdered, BarChart3, Ticket, ScanLine, ScrollText } from 'lucide-react';
 
 interface AdminNavTabsProps {
-  activeTab: 'queue' | 'analytics' | 'lots' | 'checkin';
+  activeTab: 'queue' | 'analytics' | 'lots' | 'checkin' | 'logs';
 }
 
 export function AdminNavTabs({ activeTab }: AdminNavTabsProps) {
@@ -71,6 +71,22 @@ export function AdminNavTabs({ activeTab }: AdminNavTabsProps) {
         >
           <ScanLine className="w-3.5 h-3.5 text-[#8A3CFF]" />
           <span>Portaria / Check-in</span>
+        </Link>
+      )}
+
+      {/* Aba 5: Logs de e-mail e cota */}
+      {activeTab === 'logs' ? (
+        <div className="px-4 py-2.5 bg-[#8A3CFF] text-[#0B0B0D] font-bold uppercase tracking-wider flex items-center gap-2 transition-all shadow-md">
+          <ScrollText className="w-3.5 h-3.5 text-[#0B0B0D]" />
+          <span>Logs</span>
+        </div>
+      ) : (
+        <Link
+          href="/admin/logs"
+          className="px-4 py-2.5 bg-[#141418] hover:bg-[#1A1A20] text-[#5B5B66] hover:text-[#E8E8EF] border border-[#1F1F24] hover:border-[#8A3CFF]/50 uppercase tracking-wider transition-all flex items-center gap-2"
+        >
+          <ScrollText className="w-3.5 h-3.5 text-[#8A3CFF]" />
+          <span>Logs</span>
         </Link>
       )}
     </div>

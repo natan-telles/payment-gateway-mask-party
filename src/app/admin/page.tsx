@@ -18,11 +18,23 @@ import {
   Mail,
   Send,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { AdminNavTabs } from '@/components/AdminNavTabs';
 import { WaitingQueueEntry } from '@/types/database';
 import { useCurrentLot } from '@/hooks/useCurrentLot';
+
+interface UsageWindow {
+  used: number;
+  limit: number | null;
+  remaining: number | null;
+  resetsAt: string | null;
+}
+
+type ResendUsage =
+  | { available: true; daily: UsageWindow; monthly: UsageWindow; checkedAt: string }
+  | { available: false; reason: string; checkedAt: string };
 
 export default function AdminPage() {
   const lot = useCurrentLot();
@@ -49,6 +61,11 @@ export default function AdminPage() {
   const [expirationHours, setExpirationHours] = useState(12);
   const [isReleasing, setIsReleasing] = useState(false);
   const [releaseFeedback, setReleaseFeedback] = useState<string | null>(null);
+  const [releaseWarnings, setReleaseWarnings] = useState<string[]>([]);
+  const [ignoreTicketReserve, setIgnoreTicketReserve] = useState(false);
+  const [usage, setUsage] = useState<ResendUsage | null>(null);
+  const [usageRemaining, setUsageRemaining] = useState<number | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
 
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [reminderFeedback, setReminderFeedback] = useState<string | null>(null);
@@ -250,6 +267,23 @@ export default function AdminPage() {
     updateStatus(lead.id, { notification_status: 'sent' });
   };
 
+  // Consulta a cota do Resend (usada no modal de liberação)
+  const fetchUsage = useCallback(async () => {
+    setUsageLoading(true);
+    try {
+      const res = await fetch('/api/admin/notifications/usage', { headers: { 'x-admin-password': password } });
+      const data = await res.json();
+      if (data.success) {
+        setUsage(data.usage as ResendUsage);
+        setUsageRemaining(typeof data.remaining === 'number' ? data.remaining : null);
+      }
+    } catch {
+      // silencioso: o card mostra "indisponível"
+    } finally {
+      setUsageLoading(false);
+    }
+  }, [password]);
+
   const handleReleaseBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsReleasing(true);
@@ -262,18 +296,21 @@ export default function AdminPage() {
           'Content-Type': 'application/json',
           'x-admin-password': password,
         },
-        body: JSON.stringify({ count: batchCount, expirationHours }),
+        body: JSON.stringify({ count: batchCount, expirationHours, ignoreTicketReserve }),
       });
 
       const data = await res.json();
+      setReleaseWarnings(Array.isArray(data.warnings) ? data.warnings : []);
 
       if (res.ok && data.success) {
         const mode = data.simulated ? ' (Modo Simulação)' : ' (Resend Real)';
-        setReleaseFeedback(`Sucesso: ${data.releasedCount} participante(s) notificado(s) na ordem da fila${mode}.`);
+        const quota = data.usage ? ` Cota agora: ${data.usage}.` : '';
+        setReleaseFeedback(`Sucesso: ${data.releasedCount} participante(s) notificado(s) na ordem da fila${mode}.${quota}`);
         fetchLeads();
       } else {
         setReleaseFeedback(`Erro: ${data.error || 'Falha ao liberar lote.'}`);
       }
+      void fetchUsage();
     } catch {
       setReleaseFeedback('Erro de conexão ao disparar lote.');
     } finally {
@@ -299,8 +336,9 @@ export default function AdminPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setReminderFeedback(`Lembretes enviados para ${data.remindedCount} participante(s).`);
-        setTimeout(() => setReminderFeedback(null), 5000);
+        const extra = Array.isArray(data.warnings) && data.warnings.length > 0 ? ` ${data.warnings.join(' ')}` : '';
+        setReminderFeedback(`Lembretes enviados para ${data.remindedCount} participante(s).${extra}`);
+        setTimeout(() => setReminderFeedback(null), 10000);
       } else {
         alert(data.error || 'Erro ao enviar lembretes.');
       }
@@ -571,7 +609,9 @@ export default function AdminPage() {
             <button
               onClick={() => {
                 setReleaseFeedback(null);
+                setReleaseWarnings([]);
                 setIsReleaseModalOpen(true);
+                void fetchUsage();
               }}
               className="bg-[#8A3CFF] hover:bg-[#9a54ff] text-[#0B0B0D] font-bold py-2.5 px-4 uppercase text-xs tracking-wider flex items-center gap-1.5 transition-colors"
             >
@@ -822,9 +862,45 @@ export default function AdminPage() {
               Os e-mails serão disparados para os próximos participantes da fila por ordem cronológica.
             </p>
 
+            {/* COTA DO RESEND */}
+            <div className="mb-4 p-3 bg-[#0B0B0D] border border-[#1F1F24] text-xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] uppercase tracking-widest text-[#5B5B66]">Cota de e-mails (Resend)</span>
+                <button type="button" onClick={() => void fetchUsage()} className="text-[#5B5B66] hover:text-[#E8E8EF]" title="Atualizar">
+                  <RefreshCw className={`w-3 h-3 ${usageLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+              {usage === null ? (
+                <span className="text-[#5B5B66]">Consultando...</span>
+              ) : usage.available ? (
+                <>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-persona text-2xl text-[#E8E8EF]">{usage.daily.used}<span className="text-[#5B5B66] text-sm"> / {usage.daily.limit ?? '∞'}</span></span>
+                    <span className="text-[10px] text-[#5B5B66]">hoje · {usage.monthly.used}/{usage.monthly.limit ?? '∞'} no mês</span>
+                  </div>
+                  <p className="text-[10px] text-[#8C8C9A] mt-1">
+                    Restam <strong className="text-[#E8E8EF]">{usageRemaining ?? '∞'}</strong> e-mail(s)
+                    {usageRemaining !== null && !ignoreTicketReserve ? ` → até ${Math.floor(usageRemaining / 2)} liberações (metade fica para os ingressos)` : ''}
+                    {usage.daily.resetsAt ? ` · zera às ${new Date(usage.daily.resetsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                  </p>
+                </>
+              ) : (
+                <p className="text-[10px] text-amber-300 flex gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0" />{usage.reason}</p>
+              )}
+            </div>
+
             {releaseFeedback && (
               <div className="mb-4 p-2.5 bg-[#0B0B0D] border border-[#1F1F24] text-xs">
                 {releaseFeedback}
+              </div>
+            )}
+
+            {releaseWarnings.length > 0 && (
+              <div className="mb-4 p-2.5 bg-amber-950/20 border border-amber-400/40 text-[11px] text-amber-200 space-y-1">
+                {releaseWarnings.map((w) => (
+                  <p key={w} className="flex gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{w}</p>
+                ))}
+                <Link href="/admin/logs" className="block text-[10px] uppercase tracking-wider text-amber-300 underline pt-1">Ver logs →</Link>
               </div>
             )}
 
@@ -844,7 +920,22 @@ export default function AdminPage() {
                 <span className="text-[9px] text-[#5B5B66] mt-1 block">
                   Aguardando na fila: <strong>{waitingCount}</strong>
                 </span>
+                {usageRemaining !== null && batchCount > (ignoreTicketReserve ? usageRemaining : Math.floor(usageRemaining / 2)) && (
+                  <span className="text-[9px] text-amber-300 mt-1 block">
+                    A cota atual permite no máximo {ignoreTicketReserve ? usageRemaining : Math.floor(usageRemaining / 2)}; o lote será reduzido automaticamente.
+                  </span>
+                )}
               </div>
+
+              <label className="flex items-start gap-2 text-[10px] text-[#8C8C9A] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ignoreTicketReserve}
+                  onChange={(e) => setIgnoreTicketReserve(e.target.checked)}
+                  className="mt-0.5 accent-[#8A3CFF]"
+                />
+                <span>Usar toda a cota restante (não reservar metade para os e-mails de ingresso)</span>
+              </label>
 
               <div>
                 <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">

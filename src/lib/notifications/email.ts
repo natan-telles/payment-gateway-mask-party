@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { logNotification, NotificationKind } from './log';
 
 const resendApiKey = process.env.RESEND_API_KEY;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
@@ -6,6 +7,118 @@ const emailFrom = process.env.EMAIL_FROM || 'Baile da Lagoa <onboarding@resend.d
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const unsubscribeUrl = `${appUrl}/unsubscribe`;
 const unsubscribeApiUrl = `${appUrl}/api/unsubscribe`;
+
+export interface SendResult {
+  success: boolean;
+  id?: string;
+  simulated: boolean;
+  error?: string;
+  /** Nome do erro do Resend, ex.: daily_quota_exceeded, rate_limit_exceeded */
+  errorCode?: string;
+  /** true quando o Resend recusou por cota diária ou mensal esgotada */
+  quotaExceeded: boolean;
+}
+
+export const QUOTA_ERROR_CODES = ['daily_quota_exceeded', 'monthly_quota_exceeded'];
+
+export function isQuotaError(code?: string | null) {
+  return Boolean(code && QUOTA_ERROR_CODES.includes(code));
+}
+
+const KIND_LABELS: Record<NotificationKind, string> = {
+  confirmation: 'Confirmação de fila',
+  release: 'Liberação de lote',
+  reminder: 'Lembrete',
+  ticket: 'Ingresso',
+  test: 'Teste',
+  batch: 'Lote',
+  usage: 'Cota',
+};
+
+interface DeliverContext {
+  kind: NotificationKind;
+  to: string;
+  name: string;
+  subject: string;
+  html: string;
+  leadId?: string | null;
+  meta?: Record<string, unknown>;
+  /** Linhas extras impressas no simulador (sem RESEND_API_KEY) */
+  simulatorLines?: string[];
+}
+
+// Ponto único de envio: chama o Resend, classifica o erro (cota, rate limit, etc.)
+// e grava em notification_logs toda falha — e o sucesso dos ingressos.
+async function deliver(ctx: DeliverContext): Promise<SendResult> {
+  const label = KIND_LABELS[ctx.kind];
+
+  if (!resend) {
+    console.log('------------------------------------------------------------');
+    console.log(`[SIMULADOR DE E-MAIL BAILE DA LAGOA] ${label}`);
+    console.log(`Para: ${ctx.to} (${ctx.name})`);
+    console.log(`Assunto: ${ctx.subject}`);
+    for (const line of ctx.simulatorLines ?? []) console.log(line);
+    console.log('------------------------------------------------------------');
+    return { success: true, simulated: true, quotaExceeded: false };
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: emailFrom,
+      to: ctx.to,
+      subject: ctx.subject,
+      html: ctx.html,
+      headers: {
+        'List-Unsubscribe': `<${unsubscribeApiUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
+    });
+
+    if (error) {
+      const errorCode = (error as { name?: string }).name;
+      const quotaExceeded = isQuotaError(errorCode);
+      console.error(`[Resend Error] Falha ao enviar ${label} para ${ctx.to}:`, error);
+      await logNotification({
+        level: 'error',
+        kind: ctx.kind,
+        message: quotaExceeded
+          ? `${label} NÃO enviado para ${ctx.to}: cota do Resend esgotada (${errorCode}).`
+          : `${label} NÃO enviado para ${ctx.to}: ${error.message}`,
+        email: ctx.to,
+        leadId: ctx.leadId,
+        errorCode,
+        meta: { ...ctx.meta, subject: ctx.subject },
+      });
+      return { success: false, simulated: false, error: error.message, errorCode, quotaExceeded };
+    }
+
+    console.log(`[Resend Success] ${label} enviado para ${ctx.to} (ID: ${data?.id})`);
+    if (ctx.kind === 'ticket') {
+      await logNotification({
+        level: 'info',
+        kind: 'ticket',
+        message: `Ingresso enviado para ${ctx.to}.`,
+        email: ctx.to,
+        leadId: ctx.leadId,
+        meta: { ...ctx.meta, resendId: data?.id },
+      });
+    }
+    return { success: true, id: data?.id, simulated: false, quotaExceeded: false };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'erro desconhecido';
+    console.error(`[Resend Exception] Falha ao enviar ${label} para ${ctx.to}:`, err);
+    await logNotification({
+      level: 'error',
+      kind: ctx.kind,
+      message: `${label} NÃO enviado para ${ctx.to}: exceção de conexão (${message}).`,
+      email: ctx.to,
+      leadId: ctx.leadId,
+      errorCode: 'exception',
+      meta: { ...ctx.meta, subject: ctx.subject },
+    });
+    return { success: false, simulated: false, error: message, errorCode: 'exception', quotaExceeded: false };
+  }
+}
 
 interface EmailPayload {
   to: string;
@@ -15,6 +128,8 @@ interface EmailPayload {
   expirationHours?: number;
   /** Rótulo do lote vigente, ex.: "2º LOTE" */
   lotName: string;
+  /** id em waiting_queue, para o log */
+  leadId?: string | null;
 }
 
 // Template HTML Oficial Baile da Lagoa - Liberação de Lote
@@ -400,49 +515,27 @@ export async function sendQueueConfirmationEmail({
   name,
   queuePosition,
   lotName,
+  leadId,
 }: {
   to: string;
   name: string;
   queuePosition: number;
   lotName: string;
-}) {
+  leadId?: string | null;
+}): Promise<SendResult> {
   const subject = `🎭 Lugar reservado na fila do ${lotName} · Baile da Lagoa (Posição #${queuePosition})`;
   const html = getConfirmationEmailHtml({ name, queuePosition, lotName });
 
-  if (resend) {
-    try {
-      const { data, error } = await resend.emails.send({
-        from: emailFrom,
-        to,
-        subject,
-        html,
-        headers: {
-          'List-Unsubscribe': `<${unsubscribeApiUrl}>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-        },
-      });
-
-      if (error) {
-        console.error(`[Resend Error] Falha ao enviar confirmação para ${to}:`, error);
-        return { success: false, error: error.message, simulated: false };
-      }
-
-      console.log(`[Resend Success] Confirmação enviada para ${to} (ID: ${data?.id})`);
-      return { success: true, id: data?.id, simulated: false };
-    } catch (err: any) {
-      console.error(`[Resend Exception] Falha de conexão para ${to}:`, err);
-      return { success: false, error: err.message, simulated: false };
-    }
-  }
-
-  console.log('------------------------------------------------------------');
-  console.log(`[SIMULADOR DE E-MAIL BAILE DA LAGOA] Confirmação de Fila`);
-  console.log(`Para: ${to} (${name})`);
-  console.log(`Assunto: ${subject}`);
-  console.log(`Posição: #${queuePosition}`);
-  console.log('------------------------------------------------------------');
-
-  return { success: true, simulated: true };
+  return deliver({
+    kind: 'confirmation',
+    to,
+    name,
+    subject,
+    html,
+    leadId,
+    meta: { queuePosition, lotName },
+    simulatorLines: [`Posição: #${queuePosition}`],
+  });
 }
 
 // 2. Envio de E-mail de Liberação do Lote
@@ -453,45 +546,21 @@ export async function sendQueueReleaseEmail({
   paymentUrl = `${appUrl}?checkout=true`,
   expirationHours = 12,
   lotName,
-}: EmailPayload) {
+  leadId,
+}: EmailPayload): Promise<SendResult> {
   const subject = `🎭 Seu lugar no ${lotName} está liberado · Baile da Lagoa (Posição #${queuePosition})`;
   const html = getReleaseEmailHtml({ name, queuePosition, paymentUrl, expirationHours, lotName });
 
-  if (resend) {
-    try {
-      const { data, error } = await resend.emails.send({
-        from: emailFrom,
-        to,
-        subject,
-        html,
-        headers: {
-          'List-Unsubscribe': `<${unsubscribeApiUrl}>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-        },
-      });
-
-      if (error) {
-        console.error(`[Resend Error] Falha ao enviar liberação de lote para ${to}:`, error);
-        return { success: false, error: error.message, simulated: false };
-      }
-
-      console.log(`[Resend Success] Liberação enviada para ${to} (ID: ${data?.id})`);
-      return { success: true, id: data?.id, simulated: false };
-    } catch (err: any) {
-      console.error(`[Resend Exception] Falha ao enviar e-mail via Resend para ${to}:`, err);
-      return { success: false, error: err.message, simulated: false };
-    }
-  }
-
-  console.log('------------------------------------------------------------');
-  console.log(`[SIMULADOR DE E-MAIL BAILE DA LAGOA] Liberação do ${lotName}`);
-  console.log(`Para: ${to} (${name})`);
-  console.log(`Assunto: ${subject}`);
-  console.log(`Posição: #${queuePosition}`);
-  console.log(`Link: ${paymentUrl}`);
-  console.log('------------------------------------------------------------');
-
-  return { success: true, simulated: true };
+  return deliver({
+    kind: 'release',
+    to,
+    name,
+    subject,
+    html,
+    leadId,
+    meta: { queuePosition, lotName, expirationHours },
+    simulatorLines: [`Posição: #${queuePosition}`, `Link: ${paymentUrl}`],
+  });
 }
 
 // 3. Envio de Lembrete
@@ -501,43 +570,20 @@ export async function sendReminderEmail({
   queuePosition,
   paymentUrl = `${appUrl}?checkout=true`,
   lotName,
-}: EmailPayload) {
+  leadId,
+}: EmailPayload): Promise<SendResult> {
   const subject = `⚠️ Último aviso: Seu lugar no ${lotName} expira em breve (Posição #${queuePosition})`;
   const html = getReminderEmailHtml({ name, queuePosition, paymentUrl, lotName });
 
-  if (resend) {
-    try {
-      const { data, error } = await resend.emails.send({
-        from: emailFrom,
-        to,
-        subject,
-        html,
-        headers: {
-          'List-Unsubscribe': `<${unsubscribeApiUrl}>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-        },
-      });
-
-      if (error) {
-        console.error(`[Resend Error] Falha ao enviar lembrete para ${to}:`, error);
-        return { success: false, error: error.message, simulated: false };
-      }
-
-      console.log(`[Resend Success] Lembrete enviado para ${to} (ID: ${data?.id})`);
-      return { success: true, id: data?.id, simulated: false };
-    } catch (err: any) {
-      console.error(`[Resend Exception] Falha ao enviar lembrete para ${to}:`, err);
-      return { success: false, error: err.message, simulated: false };
-    }
-  }
-
-  console.log('------------------------------------------------------------');
-  console.log(`[SIMULADOR DE E-MAIL BAILE DA LAGOA] Lembrete`);
-  console.log(`Para: ${to} (${name})`);
-  console.log(`Assunto: ${subject}`);
-  console.log('------------------------------------------------------------');
-
-  return { success: true, simulated: true };
+  return deliver({
+    kind: 'reminder',
+    to,
+    name,
+    subject,
+    html,
+    leadId,
+    meta: { queuePosition, lotName },
+  });
 }
 
 interface TicketEmailPayload {
@@ -546,6 +592,7 @@ interface TicketEmailPayload {
   ticketCode: string;
   lotName: string;
   receiptUrl?: string | null;
+  leadId?: string | null;
 }
 
 // Template HTML de Ingresso Confirmado Baile da Lagoa
@@ -634,42 +681,18 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<Tick
 }
 
 // Envio do Ingresso após confirmação do pagamento
-export async function sendTicketEmail({ to, name, ticketCode, lotName, receiptUrl }: TicketEmailPayload) {
+export async function sendTicketEmail({ to, name, ticketCode, lotName, receiptUrl, leadId }: TicketEmailPayload): Promise<SendResult> {
   const subject = `🎭 Ingresso confirmado · Baile da Lagoa (${ticketCode})`;
   const html = getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl });
 
-  if (resend) {
-    try {
-      const { data, error } = await resend.emails.send({
-        from: emailFrom,
-        to,
-        subject,
-        html,
-        headers: {
-          'List-Unsubscribe': `<${unsubscribeApiUrl}>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-        },
-      });
-
-      if (error) {
-        console.error(`[Resend Error] Falha ao enviar ingresso para ${to}:`, error);
-        return { success: false, error: error.message, simulated: false };
-      }
-
-      console.log(`[Resend Success] Ingresso enviado para ${to} (ID: ${data?.id})`);
-      return { success: true, id: data?.id, simulated: false };
-    } catch (err: any) {
-      console.error(`[Resend Exception] Falha ao enviar ingresso para ${to}:`, err);
-      return { success: false, error: err.message, simulated: false };
-    }
-  }
-
-  console.log('------------------------------------------------------------');
-  console.log(`[SIMULADOR DE E-MAIL BAILE DA LAGOA] Ingresso Confirmado`);
-  console.log(`Para: ${to} (${name})`);
-  console.log(`Assunto: ${subject}`);
-  console.log(`Ingresso: ${ticketCode} · ${lotName}`);
-  console.log('------------------------------------------------------------');
-
-  return { success: true, simulated: true };
+  return deliver({
+    kind: 'ticket',
+    to,
+    name,
+    subject,
+    html,
+    leadId,
+    meta: { ticketCode, lotName },
+    simulatorLines: [`Ingresso: ${ticketCode} · ${lotName}`],
+  });
 }
