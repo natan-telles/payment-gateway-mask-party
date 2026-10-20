@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
         result = await sendQueueConfirmationEmail({
           to: targetEmail,
           name: record.name,
+          leadId: record.id,
           queuePosition: record.queue_position,
           lotName,
         });
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
         result = await sendQueueReleaseEmail({
           to: targetEmail,
           name: record.name,
+          leadId: record.id,
           queuePosition: record.queue_position,
           paymentUrl,
           expirationHours: 12,
@@ -88,6 +90,7 @@ export async function POST(req: NextRequest) {
         result = await sendReminderEmail({
           to: targetEmail,
           name: record.name,
+          leadId: record.id,
           queuePosition: record.queue_position,
           paymentUrl,
           lotName,
@@ -98,6 +101,7 @@ export async function POST(req: NextRequest) {
         result = await sendTicketEmail({
           to: targetEmail,
           name: record.name,
+          leadId: record.id,
           ticketCode: record.ticket_code || `MASK-${record.queue_position}`,
           lotName,
         });
