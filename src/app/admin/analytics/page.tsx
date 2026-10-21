@@ -123,7 +123,7 @@ export default function AnalyticsPage() {
   const maxDayCount = data ? Math.max(...data.byDay.map((d) => d.count), 1) : 1;
 
   return (
-    <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] p-4 md:p-8 font-sans">
+    <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] p-4 pb-28 md:p-8 font-sans">
       <header className="max-w-7xl mx-auto border-b border-[#1F1F24] pb-6 mb-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">

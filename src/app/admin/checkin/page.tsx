@@ -129,7 +129,7 @@ export default function CheckinPage() {
   const wasUsed = result?.status === 'already_checked_in';
 
   return (
-    <main className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] p-4 md:p-8">
+    <main className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] p-4 pb-28 md:p-8">
       <header className="max-w-4xl mx-auto border-b border-[#1F1F24] pb-6 mb-8">
         <div className="flex items-center gap-3">
           <Link href="/admin" className="p-1.5 bg-[#141418] border border-[#1F1F24] hover:border-[#8A3CFF] text-[#5B5B66] hover:text-[#E8E8EF]" title="Voltar"><ArrowLeft className="w-4 h-4" /></Link>
