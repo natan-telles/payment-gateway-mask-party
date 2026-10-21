@@ -24,6 +24,7 @@ import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { AdminNavTabs } from '@/components/AdminNavTabs';
 import { WaitingQueueEntry } from '@/types/database';
 import { useCurrentLot } from '@/hooks/useCurrentLot';
+import { encodeCheckoutLeadId } from '@/lib/checkout-link';
 
 interface UsageWindow {
   used: number;
@@ -260,7 +261,7 @@ export default function AdminPage() {
     const rawPhone = lead.phone.replace(/\D/g, '');
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
-    const checkoutUrl = `${window.location.origin}/checkout/${lead.id}`;
+    const checkoutUrl = `${window.location.origin}/checkout/${encodeCheckoutLeadId(lead.id)}`;
 
     const messageLines = [
       `Olá, ${lead.name.split(' ')[0]}! 🎭`,
@@ -276,10 +277,9 @@ export default function AdminPage() {
       WHATSAPP_GROUP_URL,
     ];
 
-    const text = encodeURIComponent(messageLines.join('\n'));
-
-    const waUrl = `https://wa.me/${phoneWithDDI}?text=${text}`;
-    window.open(waUrl, '_blank');
+    const waUrl = new URL(`https://wa.me/${phoneWithDDI}`);
+    waUrl.searchParams.set('text', messageLines.join('\n'));
+    window.open(waUrl.toString(), '_blank', 'noopener,noreferrer');
 
     updateStatus(lead.id, { notification_status: 'sent' });
   };
