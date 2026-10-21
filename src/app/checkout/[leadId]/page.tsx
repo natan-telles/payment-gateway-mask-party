@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { CheckoutPanel } from '@/components/CheckoutPanel';
+import { decodeCheckoutLeadId } from '@/lib/checkout-link';
 
 export default function CheckoutPage({ params }: { params: Promise<{ leadId: string }> }) {
   return (
@@ -13,6 +14,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ leadId: str
 }
 
 async function CheckoutContent({ params }: { params: Promise<{ leadId: string }> }) {
-  const { leadId } = await params;
+  const { leadId: routeLeadId } = await params;
+  const leadId = decodeCheckoutLeadId(routeLeadId) ?? '';
   return <CheckoutPanel leadId={leadId} />;
 }
