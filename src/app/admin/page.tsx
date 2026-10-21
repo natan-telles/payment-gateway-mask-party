@@ -19,12 +19,14 @@ import {
   Send,
   X,
   AlertTriangle,
+  CalendarClock,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { AdminNavTabs } from '@/components/AdminNavTabs';
 import { WaitingQueueEntry } from '@/types/database';
 import { useCurrentLot } from '@/hooks/useCurrentLot';
-import { encodeCheckoutLeadId } from '@/lib/checkout-link';
 
 interface UsageWindow {
   used: number;
@@ -39,6 +41,17 @@ type ResendUsage =
 
 // Grupo oficial do Baile da Lagoa no WhatsApp (vai na mensagem de liberação individual)
 const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/LwuyP4dEui5L7Ut4htSagk?s=cl&p=i&mlu=4&ilr=4';
+
+// Rótulo do prazo de pagamento de um lead (null = sem prazo definido)
+function deadlineInfo(deadline: string | null | undefined) {
+  if (!deadline) return null;
+  const date = new Date(deadline);
+  const expired = date.getTime() <= Date.now();
+  return {
+    expired,
+    text: date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+  };
+}
 
 export default function AdminPage() {
   const lot = useCurrentLot();
@@ -73,6 +86,16 @@ export default function AdminPage() {
 
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [reminderFeedback, setReminderFeedback] = useState<string | null>(null);
+
+  // Seleção de participantes + novo prazo de pagamento
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
+  const [deadlineTargetIds, setDeadlineTargetIds] = useState<string[]>([]);
+  const [deadlineHours, setDeadlineHours] = useState(12);
+  const [deadlineSendEmail, setDeadlineSendEmail] = useState(false);
+  const [isSavingDeadline, setIsSavingDeadline] = useState(false);
+  const [deadlineFeedback, setDeadlineFeedback] = useState<string | null>(null);
+  const [deadlineOpenedAt, setDeadlineOpenedAt] = useState(0);
 
   const [isTestEmailModalOpen, setIsTestEmailModalOpen] = useState(false);
   const [testEmailTo, setTestEmailTo] = useState('');
@@ -261,29 +284,85 @@ export default function AdminPage() {
     const rawPhone = lead.phone.replace(/\D/g, '');
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
-    const checkoutUrl = `${window.location.origin}/checkout/${encodeCheckoutLeadId(lead.id)}`;
+    const text = encodeURIComponent(
+      [
+        `Olá, ${lead.name.split(' ')[0]}! 🎭`,
+        '',
+        `Sua prioridade na fila do *BAILE DA LAGOA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).`,
+        '',
+        `Seu acesso para compra de ingresso no *${lot.name}* está liberado por tempo limitado.`,
+        '',
+        '👉 *Link de compra* (pagamento via Pix, o ingresso com QR Code chega no seu e-mail assim que confirmar):',
+        `${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`,
+        '',
+        '📲 Entre também no *grupo oficial da festa* para receber avisos, endereço e novidades:',
+        WHATSAPP_GROUP_URL,
+      ].join('\n')
+    );
 
-    const messageLines = [
-      `Olá, ${lead.name.split(' ')[0]}! 🎭`,
-      '',
-      `Sua prioridade na fila do *BAILE DA LAGOA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).`,
-      '',
-      `Seu acesso para compra de ingresso no *${lot.name}* está liberado por tempo limitado.`,
-      '',
-      '👉 *Link de compra* (pagamento via Pix, o ingresso com QR Code chega no seu e-mail assim que confirmar):',
-      checkoutUrl,
-      '',
-      '📲 Entre também no *grupo oficial da festa* para receber avisos, endereço e novidades:',
-      WHATSAPP_GROUP_URL,
-    ];
-
-    const waUrl = new URL(`https://wa.me/${phoneWithDDI}`);
-    waUrl.searchParams.set('text', messageLines.join('\n'));
-    window.open(waUrl.toString(), '_blank', 'noopener,noreferrer');
+    const waUrl = `https://wa.me/${phoneWithDDI}?text=${text}`;
+    window.open(waUrl, '_blank');
 
     updateStatus(lead.id, { notification_status: 'sent' });
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allVisibleSelected = leads.length > 0 && leads.every((lead) => selectedIds.has(lead.id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allVisibleSelected ? new Set() : new Set(leads.map((lead) => lead.id)));
+  };
+
+  const openDeadlineModal = (ids: string[]) => {
+    setDeadlineTargetIds(ids);
+    setDeadlineFeedback(null);
+    setDeadlineOpenedAt(Date.now());
+    setIsDeadlineModalOpen(true);
+  };
+
+  const handleSaveDeadline = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deadlineTargetIds.length === 0) return;
+    setIsSavingDeadline(true);
+    setDeadlineFeedback(null);
+
+    try {
+      const res = await fetch('/api/admin/queue/deadline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ ids: deadlineTargetIds, hours: deadlineHours, sendEmail: deadlineSendEmail }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const until = data.deadline
+          ? new Date(data.deadline).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+          : '';
+        const parts = [`Novo prazo até ${until} para ${data.updatedCount} participante(s).`];
+        if (data.reactivatedCount) parts.push(`${data.reactivatedCount} reativado(s) de expirado.`);
+        if (data.skippedPaid) parts.push(`${data.skippedPaid} ignorado(s) por já estarem pagos.`);
+        if (deadlineSendEmail) parts.push(`E-mails: ${data.emailedCount} enviado(s), ${data.emailFailed} falha(s).`);
+        if (Array.isArray(data.warnings)) parts.push(...data.warnings);
+        setDeadlineFeedback(parts.join(' '));
+        setSelectedIds(new Set());
+        fetchLeads();
+      } else {
+        setDeadlineFeedback(`Erro: ${data.error || 'Falha ao atualizar prazo.'}`);
+      }
+    } catch {
+      setDeadlineFeedback('Erro de conexão ao atualizar prazo.');
+    } finally {
+      setIsSavingDeadline(false);
+    }
+  };
 
   // Consulta a cota do Resend (usada no modal de liberação)
   const fetchUsage = useCallback(async () => {
@@ -525,8 +604,8 @@ export default function AdminPage() {
   const waitingCount = metrics.total - metrics.notifiedCount;
 
   return (
-    <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] p-4 md:p-8 font-sans">
-      <header className="max-w-7xl mx-auto border-b border-[#1F1F24] pb-6 mb-8">
+    <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] p-4 pb-28 md:p-8 font-sans">
+      <header className="max-w-7xl mx-auto border-b border-[#1F1F24] pb-4 md:pb-6 mb-6 md:mb-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
@@ -539,7 +618,7 @@ export default function AdminPage() {
               </Link>
               <div className="flex items-center gap-2">
                 <PersonaMaskIcon className="w-5 h-3.5" fillColor="#8A3CFF" />
-                <span className="font-persona text-3xl uppercase tracking-tight text-[#E8E8EF]">
+                <span className="font-persona text-2xl md:text-3xl uppercase tracking-tight text-[#E8E8EF]">
                   BAILE DA LAGOA <span className="text-[#8A3CFF]">// ADMIN</span>
                 </span>
               </div>
@@ -549,7 +628,7 @@ export default function AdminPage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-3 font-data text-xs">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 font-data text-xs">
             <button
               onClick={() => fetchLeads()}
               disabled={loading}
@@ -623,7 +702,7 @@ export default function AdminPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 md:flex md:flex-wrap items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => {
                 setReleaseFeedback(null);
@@ -631,7 +710,7 @@ export default function AdminPage() {
                 setIsReleaseModalOpen(true);
                 void fetchUsage();
               }}
-              className="bg-[#8A3CFF] hover:bg-[#9a54ff] text-[#0B0B0D] font-bold py-2.5 px-4 uppercase text-xs tracking-wider flex items-center gap-1.5 transition-colors"
+              className="col-span-2 md:col-span-1 bg-[#8A3CFF] hover:bg-[#9a54ff] text-[#0B0B0D] font-bold py-3 md:py-2.5 px-4 uppercase text-xs tracking-wider flex items-center justify-center gap-1.5 transition-colors"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Liberar Lote</span>
@@ -640,7 +719,7 @@ export default function AdminPage() {
             <button
               onClick={handleSendReminders}
               disabled={isSendingReminders || metrics.pendingPaymentCount === 0}
-              className="bg-[#0B0B0D] hover:bg-[#1f1f24] disabled:opacity-40 text-[#E8E8EF] py-2.5 px-3.5 uppercase text-xs tracking-wider border border-[#1F1F24] flex items-center gap-1.5 transition-colors"
+              className="bg-[#0B0B0D] hover:bg-[#1f1f24] disabled:opacity-40 text-[#E8E8EF] py-3 md:py-2.5 px-3.5 uppercase text-xs tracking-wider border border-[#1F1F24] flex items-center justify-center gap-1.5 transition-colors"
             >
               <Clock className="w-3.5 h-3.5 text-[#8A3CFF]" />
               <span>Lembretes ({metrics.pendingPaymentCount})</span>
@@ -653,7 +732,7 @@ export default function AdminPage() {
                 setEmailModalTab('teste');
                 setIsTestEmailModalOpen(true);
               }}
-              className="bg-[#141418] hover:bg-[#1f1f24] text-[#E8E8EF] py-2.5 px-3.5 uppercase text-xs tracking-wider border border-[#1F1F24] hover:border-[#8A3CFF]/50 flex items-center gap-1.5 transition-colors"
+              className="bg-[#141418] hover:bg-[#1f1f24] text-[#E8E8EF] py-3 md:py-2.5 px-3.5 uppercase text-xs tracking-wider border border-[#1F1F24] hover:border-[#8A3CFF]/50 flex items-center justify-center gap-1.5 transition-colors"
             >
               <Mail className="w-3.5 h-3.5 text-[#8A3CFF]" />
               <span>Enviar Email</span>
@@ -680,11 +759,11 @@ export default function AdminPage() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="grid grid-cols-2 md:flex md:flex-wrap items-center gap-2 w-full md:w-auto">
             <select
               value={notificationFilter}
               onChange={(e) => setNotificationFilter(e.target.value)}
-              className="bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] p-2 outline-none text-xs"
+              className="w-full bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] p-2.5 md:p-2 outline-none text-xs"
             >
               <option value="all">Notificação: Todas</option>
               <option value="pending">Pendente</option>
@@ -694,7 +773,7 @@ export default function AdminPage() {
             <select
               value={paymentFilter}
               onChange={(e) => setPaymentFilter(e.target.value)}
-              className="bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] p-2 outline-none text-xs"
+              className="w-full bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] p-2.5 md:p-2 outline-none text-xs"
             >
               <option value="all">Pagamento: Todos</option>
               <option value="pending">Pendente</option>
@@ -705,7 +784,7 @@ export default function AdminPage() {
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] p-2 outline-none text-xs"
+              className="w-full col-span-2 bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] p-2.5 md:p-2 outline-none text-xs"
             >
               <option value="all">Origem: Todas</option>
               <option value="poster">Poster</option>
@@ -717,11 +796,145 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* TABELA DE GESTÃO DA FILA */}
-        <div className="bg-[#141418] border border-[#1F1F24] overflow-x-auto">
+        {/* BARRA DE SELEÇÃO */}
+        {selectedIds.size > 0 && (
+          <div className="sticky top-2 z-30 bg-[#8A3CFF] text-[#0B0B0D] p-3 flex flex-wrap items-center justify-between gap-2 font-data text-xs shadow-xl">
+            <span className="font-bold uppercase tracking-wider">{selectedIds.size} selecionado(s)</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openDeadlineModal(Array.from(selectedIds))}
+                className="bg-[#0B0B0D] text-[#E8E8EF] px-3 py-2 uppercase text-[10px] tracking-wider flex items-center gap-1.5"
+              >
+                <CalendarClock className="w-3.5 h-3.5 text-[#B48CFF]" />
+                Novo prazo
+              </button>
+              <button onClick={() => setSelectedIds(new Set())} className="px-3 py-2 uppercase text-[10px] tracking-wider underline">
+                Limpar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* LISTA EM CARTÕES (CELULAR) */}
+        <div className="md:hidden space-y-2">
+          {leads.length === 0 ? (
+            <div className="bg-[#141418] border border-[#1F1F24] p-8 text-center text-[#5B5B66] uppercase font-data text-xs">
+              {loading ? 'Carregando dados...' : 'Nenhum lead encontrado com os filtros aplicados.'}
+            </div>
+          ) : (
+            leads.map((lead) => {
+              const isNotified = lead.notification_status === 'sent';
+              const isPaid = lead.payment_status === 'approved';
+              const waLink = `https://wa.me/55${lead.phone.replace(/\D/g, '')}`;
+              const deadline = deadlineInfo(lead.payment_deadline);
+              const selected = selectedIds.has(lead.id);
+
+              return (
+                <div key={lead.id} className={`bg-[#141418] border p-3 font-data ${selected ? 'border-[#8A3CFF]' : 'border-[#1F1F24]'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex items-start gap-2">
+                      <button
+                        onClick={() => toggleSelect(lead.id)}
+                        className={`shrink-0 p-1 -ml-1 ${selected ? 'text-[#8A3CFF]' : 'text-[#5B5B66]'}`}
+                        aria-label={selected ? 'Desmarcar' : 'Selecionar'}
+                      >
+                        {selected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                      </button>
+                      <div className="min-w-0">
+                      <span className="font-persona text-lg text-[#8A3CFF] leading-none">
+                        #{String(lead.queue_position).padStart(4, '0')}
+                      </span>
+                      <strong className="block uppercase text-[#E8E8EF] text-sm truncate mt-0.5">{lead.name}</strong>
+                      <span className="block text-[10px] text-[#5B5B66] lowercase truncate">{lead.email}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => openDeadlineModal([lead.id])}
+                        className="p-2.5 bg-[#8A3CFF]/15 active:bg-[#8A3CFF] text-[#B48CFF] transition-colors"
+                        title="Novo prazo de pagamento"
+                        aria-label="Novo prazo de pagamento"
+                      >
+                        <CalendarClock className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleNotifyWhatsApp(lead)}
+                        className="p-2.5 bg-emerald-500/20 active:bg-emerald-500 text-emerald-300 transition-colors"
+                        title="Disparar no WhatsApp"
+                        aria-label="Disparar liberação no WhatsApp"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(lead.id, lead.name)}
+                        className="p-2.5 bg-red-950/20 active:bg-red-900 text-red-400 transition-colors"
+                        title="Excluir"
+                        aria-label="Excluir cadastro"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[#5B5B66]">
+                    <a href={waLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                      <MessageSquare className="w-3 h-3" />
+                      {lead.phone}
+                    </a>
+                    <span className="bg-[#0B0B0D] border border-[#1F1F24] px-1.5 py-0.5 uppercase text-[9px]">{lead.source}</span>
+                    <span>
+                      {new Date(lead.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {(lead.neighborhood || lead.age || lead.instagram) && (
+                      <span className="w-full text-[#8C8C9A]">
+                        {[lead.neighborhood, lead.age ? `${lead.age} anos` : null, lead.instagram].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => updateStatus(lead.id, { notification_status: isNotified ? 'pending' : 'sent' })}
+                      className={`py-2 text-[10px] font-bold uppercase transition-colors ${
+                        isNotified ? 'bg-[#8A3CFF] text-[#0B0B0D]' : 'bg-[#0B0B0D] border border-[#1F1F24] text-[#5B5B66]'
+                      }`}
+                    >
+                      Notif.: {isNotified ? 'Enviada' : 'Pendente'}
+                    </button>
+                    <button
+                      onClick={() => updateStatus(lead.id, { payment_status: isPaid ? 'pending' : 'approved' })}
+                      className={`py-2 text-[10px] font-bold uppercase transition-colors ${
+                        isPaid
+                          ? 'bg-emerald-500 text-[#0B0B0D]'
+                          : lead.payment_status === 'expired'
+                          ? 'bg-[#FF2E3B] text-white'
+                          : 'bg-[#0B0B0D] border border-[#1F1F24] text-[#5B5B66]'
+                      }`}
+                    >
+                      Pgto: {lead.payment_status.toUpperCase()}
+                    </button>
+                  </div>
+                  {deadline && (
+                    <p className={`mt-2 text-[10px] ${deadline.expired && !isPaid ? 'text-[#FF2E3B]' : 'text-[#5B5B66]'}`}>
+                      Prazo de pagamento: {deadline.text}{deadline.expired && !isPaid ? ' · EXPIRADO' : ''}
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* TABELA DE GESTÃO DA FILA (DESKTOP) */}
+        <div className="hidden md:block bg-[#141418] border border-[#1F1F24] overflow-x-auto">
           <table className="w-full text-left font-data text-xs border-collapse">
             <thead>
               <tr className="bg-[#0B0B0D] border-b border-[#1F1F24] text-[#5B5B66] uppercase text-[9px]">
+                <th className="p-3 text-center w-8">
+                  <button onClick={toggleSelectAll} className={allVisibleSelected ? 'text-[#8A3CFF]' : 'text-[#5B5B66] hover:text-[#E8E8EF]'} title="Selecionar todos (filtrados)">
+                    {allVisibleSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                  </button>
+                </th>
                 <th className="p-3 text-center">POS</th>
                 <th className="p-3">PARTICIPANTE</th>
                 <th className="p-3">CONTATO</th>
@@ -736,7 +949,7 @@ export default function AdminPage() {
             <tbody className="divide-y divide-[#1F1F24]">
               {leads.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-[#5B5B66] uppercase">
+                  <td colSpan={10} className="p-8 text-center text-[#5B5B66] uppercase">
                     {loading ? 'Carregando dados...' : 'Nenhum lead encontrado com os filtros aplicados.'}
                   </td>
                 </tr>
@@ -744,9 +957,16 @@ export default function AdminPage() {
                 leads.map((lead) => {
                   const isNotified = lead.notification_status === 'sent';
                   const isPaid = lead.payment_status === 'approved';
+                  const deadline = deadlineInfo(lead.payment_deadline);
+                  const selected = selectedIds.has(lead.id);
 
                   return (
-                    <tr key={lead.id} className="hover:bg-[#1A1A20] transition-colors">
+                    <tr key={lead.id} className={`hover:bg-[#1A1A20] transition-colors ${selected ? 'bg-[#8A3CFF]/10' : ''}`}>
+                      <td className="p-3 text-center">
+                        <button onClick={() => toggleSelect(lead.id)} className={selected ? 'text-[#8A3CFF]' : 'text-[#5B5B66] hover:text-[#E8E8EF]'} aria-label={selected ? 'Desmarcar' : 'Selecionar'}>
+                          {selected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                        </button>
+                      </td>
                       <td className="p-3 text-center">
                         <span className="font-persona text-base text-[#8A3CFF]">
                           #{String(lead.queue_position).padStart(4, '0')}
@@ -829,10 +1049,22 @@ export default function AdminPage() {
                         >
                           {lead.payment_status.toUpperCase()}
                         </button>
+                        {deadline && (
+                          <span className={`block mt-1 text-[9px] whitespace-nowrap ${deadline.expired && !isPaid ? 'text-[#FF2E3B]' : 'text-[#5B5B66]'}`}>
+                            até {deadline.text}{deadline.expired && !isPaid ? ' · EXP.' : ''}
+                          </span>
+                        )}
                       </td>
 
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => openDeadlineModal([lead.id])}
+                            className="p-1.5 bg-[#8A3CFF]/15 hover:bg-[#8A3CFF] text-[#B48CFF] hover:text-[#0B0B0D] transition-colors"
+                            title="Novo prazo de pagamento"
+                          >
+                            <CalendarClock className="w-3 h-3" />
+                          </button>
                           <button
                             onClick={() => handleNotifyWhatsApp(lead)}
                             className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-[#0B0B0D] transition-colors"
@@ -859,10 +1091,95 @@ export default function AdminPage() {
         </div>
       </div>
 
+      {/* MODAL DE NOVO PRAZO DE PAGAMENTO */}
+      {isDeadlineModalOpen && (
+        <div className="fixed inset-0 bg-[#0B0B0D]/90 backdrop-blur-md z-50 flex items-center justify-center p-4 font-data">
+          <div className="bg-[#141418] text-[#E8E8EF] border border-[#1F1F24] w-full max-w-sm p-5 md:p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setIsDeadlineModalOpen(false)}
+              className="absolute top-4 right-4 text-[#5B5B66] hover:text-[#E8E8EF] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <span className="text-[9px] uppercase text-[#8A3CFF] tracking-widest block mb-1">
+              {'// SEGUNDA CHANCE'}
+            </span>
+            <h3 className="font-persona text-2xl uppercase tracking-tight mb-2">
+              NOVO PRAZO DE PAGAMENTO
+            </h3>
+            <p className="text-xs text-[#5B5B66] mb-5">
+              {deadlineTargetIds.length === 1
+                ? 'O link de compra deste participante volta a funcionar até o novo prazo.'
+                : `Os links de compra dos ${deadlineTargetIds.length} participantes selecionados voltam a funcionar até o novo prazo.`}{' '}
+              Quem estava como expirado volta para pendente; quem já pagou é ignorado.
+            </p>
+
+            {deadlineFeedback && (
+              <div className="mb-4 p-2.5 bg-[#0B0B0D] border border-[#1F1F24] text-xs">{deadlineFeedback}</div>
+            )}
+
+            <form onSubmit={handleSaveDeadline} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">Prazo a partir de agora (horas):</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="336"
+                  value={deadlineHours}
+                  onChange={(e) => setDeadlineHours(Number(e.target.value))}
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] text-[#E8E8EF] p-2.5 font-bold outline-none"
+                />
+                <div className="flex gap-1.5 mt-2">
+                  {[6, 12, 24, 48].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setDeadlineHours(h)}
+                      className={`flex-1 py-1.5 text-[10px] border ${deadlineHours === h ? 'bg-[#8A3CFF] text-[#0B0B0D] border-[#8A3CFF] font-bold' : 'bg-[#0B0B0D] border-[#1F1F24] text-[#5B5B66]'}`}
+                    >
+                      {h}h
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[9px] text-[#5B5B66] mt-1 block">
+                  Vence em: {new Date(deadlineOpenedAt + deadlineHours * 60 * 60 * 1000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+
+              <label className="flex items-start gap-2 text-[10px] text-[#8C8C9A] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deadlineSendEmail}
+                  onChange={(e) => setDeadlineSendEmail(e.target.checked)}
+                  className="mt-0.5 accent-[#8A3CFF]"
+                />
+                <span>Reenviar o e-mail de liberação com o novo prazo (gasta cota do Resend). Sem marcar, avise pelo WhatsApp.</span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={isSavingDeadline}
+                className="w-full bg-[#8A3CFF] hover:bg-[#9a54ff] disabled:opacity-50 text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors"
+              >
+                {isSavingDeadline ? (
+                  <span>SALVANDO...</span>
+                ) : (
+                  <>
+                    <CalendarClock className="w-4 h-4" />
+                    <span>CONFIRMAR NOVO PRAZO</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DE LIBERAÇÃO DE LOTE */}
       {isReleaseModalOpen && (
         <div className="fixed inset-0 bg-[#0B0B0D]/90 backdrop-blur-md z-50 flex items-center justify-center p-4 font-data">
-          <div className="bg-[#141418] text-[#E8E8EF] border border-[#1F1F24] w-full max-w-sm p-6 relative shadow-2xl">
+          <div className="bg-[#141418] text-[#E8E8EF] border border-[#1F1F24] w-full max-w-sm p-5 md:p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsReleaseModalOpen(false)}
               className="absolute top-4 right-4 text-[#5B5B66] hover:text-[#E8E8EF] transition-colors"
