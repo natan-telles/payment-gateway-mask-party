@@ -284,9 +284,8 @@ export default function AdminPage() {
     const rawPhone = lead.phone.replace(/\D/g, '');
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
-   const checkoutUrl = `${window.location.origin}/checkout/${encodeCheckoutLeadId(lead.id)}`;
-  
-      const messageLines = [
+    const text = encodeURIComponent(
+      [
         `Olá, ${lead.name.split(' ')[0]}! 🎭`,
         '',
         `Sua prioridade na fila do *BAILE DA LAGOA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).`,
@@ -294,15 +293,15 @@ export default function AdminPage() {
         `Seu acesso para compra de ingresso no *${lot.name}* está liberado por tempo limitado.`,
         '',
         '👉 *Link de compra* (pagamento via Pix, o ingresso com QR Code chega no seu e-mail assim que confirmar):',
-        checkoutUrl,
+        `${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`,
         '',
         '📲 Entre também no *grupo oficial da festa* para receber avisos, endereço e novidades:',
         WHATSAPP_GROUP_URL,
-      ];
+      ].join('\n')
+    );
 
-    const waUrl = new URL(`https://wa.me/${phoneWithDDI}`);
-    waUrl.searchParams.set('text', messageLines.join('\n'));
-    window.open(waUrl.toString(), '_blank', 'noopener,noreferrer');
+    const waUrl = `https://wa.me/${phoneWithDDI}?text=${text}`;
+    window.open(waUrl, '_blank');
 
     updateStatus(lead.id, { notification_status: 'sent' });
   };
