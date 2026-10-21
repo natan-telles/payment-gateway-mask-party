@@ -36,6 +36,9 @@ type ResendUsage =
   | { available: true; daily: UsageWindow; monthly: UsageWindow; checkedAt: string }
   | { available: false; reason: string; checkedAt: string };
 
+// Grupo oficial do Baile da Lagoa no WhatsApp (vai na mensagem de liberação individual)
+const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/LwuyP4dEui5L7Ut4htSagk?s=cl&p=i&mlu=4&ilr=4';
+
 export default function AdminPage() {
   const lot = useCurrentLot();
   const [password, setPassword] = useState('');
@@ -258,7 +261,19 @@ export default function AdminPage() {
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
     const text = encodeURIComponent(
-      `Olá, ${lead.name.split(' ')[0]}!\n\nSua prioridade na fila do *BAILE DA LAGOA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).\n\nSeu acesso para compra de ingresso no ${lot.name} está liberado por tempo limitado.\n\nLink de compra: ${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`
+      [
+        `Olá, ${lead.name.split(' ')[0]}! 🎭`,
+        '',
+        `Sua prioridade na fila do *BAILE DA LAGOA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).`,
+        '',
+        `Seu acesso para compra de ingresso no *${lot.name}* está liberado por tempo limitado.`,
+        '',
+        '👉 *Link de compra* (pagamento via Pix, o ingresso com QR Code chega no seu e-mail assim que confirmar):',
+        `${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`,
+        '',
+        '📲 Entre também no *grupo oficial da festa* para receber avisos, endereço e novidades:',
+        WHATSAPP_GROUP_URL,
+      ].join('\n')
     );
 
     const waUrl = `https://wa.me/${phoneWithDDI}?text=${text}`;

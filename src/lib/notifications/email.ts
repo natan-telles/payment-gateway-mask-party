@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import QRCode from 'qrcode';
 import { logNotification, NotificationKind } from './log';
 
 const resendApiKey = process.env.RESEND_API_KEY;
@@ -45,6 +46,17 @@ interface DeliverContext {
   meta?: Record<string, unknown>;
   /** Linhas extras impressas no simulador (sem RESEND_API_KEY) */
   simulatorLines?: string[];
+  /** Anexos (ex.: QR Code do ingresso embutido via cid:) */
+  attachments?: EmailAttachment[];
+}
+
+interface EmailAttachment {
+  filename: string;
+  /** conteúdo em base64 */
+  content: string;
+  contentType: string;
+  /** quando definido, a imagem pode ser referenciada no HTML como <img src="cid:..."> */
+  contentId?: string;
 }
 
 // Ponto único de envio: chama o Resend, classifica o erro (cota, rate limit, etc.)
@@ -72,6 +84,7 @@ async function deliver(ctx: DeliverContext): Promise<SendResult> {
         'List-Unsubscribe': `<${unsubscribeApiUrl}>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       },
+      attachments: ctx.attachments,
     });
 
     if (error) {
@@ -596,7 +609,7 @@ interface TicketEmailPayload {
 }
 
 // Template HTML de Ingresso Confirmado Baile da Lagoa
-function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<TicketEmailPayload, 'to'>) {
+function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl, hasQr }: Omit<TicketEmailPayload, 'to'> & { hasQr: boolean }) {
   return `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -626,8 +639,26 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<Tick
                 Olá, <strong style="color: #E8E8EF;">${name}</strong>
               </p>
               <p style="font-size: 12px; color: #8C8C9A; font-family: monospace; line-height: 1.6; margin: 0 0 16px 0;">
-                Seu pagamento foi confirmado com sucesso. Apresente o código abaixo na portaria do <strong style="color: #E8E8EF;">Baile da Lagoa</strong>.
+                Seu pagamento foi confirmado com sucesso. Apresente o QR Code abaixo na portaria do <strong style="color: #E8E8EF;">Baile da Lagoa</strong>. Vale também mostrar só o código.
               </p>
+
+              ${
+                hasQr
+                  ? `<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 14px; text-align: center;">
+                <tr>
+                  <td style="padding: 14px; background-color: #FFFFFF; border: 2px solid #8A3CFF;">
+                    <img src="cid:${TICKET_QR_CID}" alt="QR Code do ingresso ${ticketCode}" width="220" height="220" style="display: block; margin: 0 auto; width: 220px; height: 220px; max-width: 100%;">
+                    <div style="font-size: 10px; font-family: monospace; color: #0B0B0D; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px;">
+                      QR Code válido para entrada
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              <p style="font-size: 10px; color: #5B5B66; font-family: monospace; line-height: 1.5; margin: 0 0 16px 0; text-align: center;">
+                Não está vendo a imagem? Ela também vai em anexo (${TICKET_QR_FILENAME}) e você pode abrir seu ingresso em <a href="${appUrl}" style="color: #8A3CFF; text-decoration: underline;">${appUrl.replace(/^https?:\/\//, '')}</a> consultando pelo seu e-mail ou telefone.
+              </p>`
+                  : ''
+              }
 
               <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0B0B0D; border: 1px solid #1F1F24; margin-bottom: 16px; text-align: center;">
                 <tr>
@@ -681,9 +712,43 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl }: Omit<Tick
 }
 
 // Envio do Ingresso após confirmação do pagamento
+const TICKET_QR_CID = 'ticket-qr';
+const TICKET_QR_FILENAME = 'ingresso-qrcode.png';
+
+// Gera o PNG do QR Code do ingresso (mesmo conteúdo que a portaria lê: o código puro).
+// Fundo branco e módulos escuros para a câmera ler bem; se falhar, o e-mail vai só com o código.
+async function buildTicketQrAttachment(ticketCode: string): Promise<EmailAttachment | null> {
+  try {
+    const png = await QRCode.toBuffer(ticketCode, {
+      type: 'png',
+      width: 440,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0B0B0D', light: '#FFFFFF' },
+    });
+    return {
+      filename: TICKET_QR_FILENAME,
+      content: png.toString('base64'),
+      contentType: 'image/png',
+      contentId: TICKET_QR_CID,
+    };
+  } catch (err) {
+    console.error(`[Ingresso] Falha ao gerar QR Code de ${ticketCode}:`, err);
+    await logNotification({
+      level: 'warn',
+      kind: 'ticket',
+      message: `QR Code do ingresso ${ticketCode} não pôde ser gerado; e-mail enviado só com o código.`,
+      errorCode: 'qr_generation_failed',
+      meta: { ticketCode },
+    });
+    return null;
+  }
+}
+
 export async function sendTicketEmail({ to, name, ticketCode, lotName, receiptUrl, leadId }: TicketEmailPayload): Promise<SendResult> {
   const subject = `🎭 Ingresso confirmado · Baile da Lagoa (${ticketCode})`;
-  const html = getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl });
+  const qr = await buildTicketQrAttachment(ticketCode);
+  const html = getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl, hasQr: qr !== null });
 
   return deliver({
     kind: 'ticket',
@@ -692,7 +757,8 @@ export async function sendTicketEmail({ to, name, ticketCode, lotName, receiptUr
     subject,
     html,
     leadId,
-    meta: { ticketCode, lotName },
-    simulatorLines: [`Ingresso: ${ticketCode} · ${lotName}`],
+    meta: { ticketCode, lotName, qrAttached: qr !== null },
+    simulatorLines: [`Ingresso: ${ticketCode} · ${lotName}`, `QR Code: ${qr ? 'anexado (' + TICKET_QR_FILENAME + ')' : 'não gerado'}`],
+    attachments: qr ? [qr] : undefined,
   });
 }
