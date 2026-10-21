@@ -260,27 +260,31 @@ export default function AdminPage() {
     const rawPhone = lead.phone.replace(/\D/g, '');
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
-    const text = encodeURIComponent(
-      [
-        `Olá, ${lead.name.split(' ')[0]}! 🎭`,
-        '',
-        `Sua prioridade na fila do *BAILE DA LAGOA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).`,
-        '',
-        `Seu acesso para compra de ingresso no *${lot.name}* está liberado por tempo limitado.`,
-        '',
-        '👉 *Link de compra* (pagamento via Pix, o ingresso com QR Code chega no seu e-mail assim que confirmar):',
-        `${window.location.origin}?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`,
-        '',
-        '📲 Entre também no *grupo oficial da festa* para receber avisos, endereço e novidades:',
-        WHATSAPP_GROUP_URL,
-      ].join('\n')
-    );
+    // Monta a URL separadamente para evitar que o encodeURIComponent quebre os parâmetros
+    const checkoutUrl = `${window.location.origin}/?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`;
+
+    const messageLines = [
+      `Olá, ${lead.name.split(' ')[0]}! 🎭`,
+      '',
+      `Sua prioridade na fila do *BAILE DA LAGOA (31.10 · SJC)* chegou (Posição #${lead.queue_position}).`,
+      '',
+      `Seu acesso para compra de ingresso no *${lot.name}* está liberado por tempo limitado.`,
+      '',
+      '👉 *Link de compra* (pagamento via Pix, o ingresso com QR Code chega no seu e-mail assim que confirmar):',
+      checkoutUrl,
+      '',
+      '📲 Entre também no *grupo oficial da festa* para receber avisos, endereço e novidades:',
+      WHATSAPP_GROUP_URL,
+    ];
+
+    const text = encodeURIComponent(messageLines.join('\n'));
 
     const waUrl = `https://wa.me/${phoneWithDDI}?text=${text}`;
     window.open(waUrl, '_blank');
 
     updateStatus(lead.id, { notification_status: 'sent' });
   };
+
 
   // Consulta a cota do Resend (usada no modal de liberação)
   const fetchUsage = useCallback(async () => {
