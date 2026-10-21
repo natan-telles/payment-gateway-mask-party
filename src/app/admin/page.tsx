@@ -260,8 +260,7 @@ export default function AdminPage() {
     const rawPhone = lead.phone.replace(/\D/g, '');
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
-    // Monta a URL separadamente para evitar que o encodeURIComponent quebre os parâmetros
-    const checkoutUrl = `${window.location.origin}/?checkout=true&lead=${lead.id}&pos=${lead.queue_position}`;
+    const checkoutUrl = `${window.location.origin}/checkout/${lead.id}`;
 
     const messageLines = [
       `Olá, ${lead.name.split(' ')[0]}! 🎭`,
