@@ -183,7 +183,7 @@ export function JoinQueueModal({ isOpen, lotName = DEFAULT_LOT.name, onClose, on
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-0.5">
             <div>
               <label className="block text-[10px] uppercase text-[#5B5B66] mb-1 font-bold">
-                Idade <span className="font-normal text-[9px] lowercase opacity-75">(opc.)</span>
+                Idade
               </label>
               <input
                 type="number"
@@ -198,7 +198,7 @@ export function JoinQueueModal({ isOpen, lotName = DEFAULT_LOT.name, onClose, on
 
             <div>
               <label className="block text-[10px] uppercase text-[#5B5B66] mb-1 font-bold">
-                Bairro <span className="font-normal text-[9px] lowercase opacity-75">(opc.)</span>
+                Bairro
               </label>
               <input
                 type="text"
@@ -211,7 +211,7 @@ export function JoinQueueModal({ isOpen, lotName = DEFAULT_LOT.name, onClose, on
 
             <div>
               <label className="block text-[10px] uppercase text-[#5B5B66] mb-1 font-bold">
-                Instagram <span className="font-normal text-[9px] lowercase opacity-75">(opc.)</span>
+                Instagram
               </label>
               <input
                 type="text"
