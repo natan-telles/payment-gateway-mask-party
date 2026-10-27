@@ -2,13 +2,41 @@
 
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Camera, CheckCircle2, CircleAlert, Keyboard, ScanLine, X } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle2, CircleAlert, Keyboard, Lock, LogOut, ScanLine, Users, X } from 'lucide-react';
 import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser';
 import { AdminNavTabs } from '@/components/AdminNavTabs';
 import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 
 const ADMIN_PW_KEY = 'mask_party_admin_pw';
-const subscribeToNothing = () => () => {};
+const ADMIN_ROLE_KEY = 'mask_party_admin_role';
+
+// Pequeno "store" sobre o sessionStorage para a tela reagir ao login feito aqui mesmo
+const pwListeners = new Set<() => void>();
+function subscribePassword(cb: () => void) {
+  pwListeners.add(cb);
+  window.addEventListener('storage', cb);
+  return () => {
+    pwListeners.delete(cb);
+    window.removeEventListener('storage', cb);
+  };
+}
+function storeSession(password: string | null, role: string | null) {
+  if (password) sessionStorage.setItem(ADMIN_PW_KEY, password);
+  else sessionStorage.removeItem(ADMIN_PW_KEY);
+  if (role) sessionStorage.setItem(ADMIN_ROLE_KEY, role);
+  else sessionStorage.removeItem(ADMIN_ROLE_KEY);
+  pwListeners.forEach((cb) => cb());
+}
+
+type CheckinStats = {
+  total: number;
+  checkedIn: number;
+  remaining: number;
+  courtesyTotal: number;
+  courtesyIn: number;
+  last15min: number;
+  at: string;
+};
 
 type CheckinResult = {
   success: boolean;
@@ -22,14 +50,69 @@ type CheckinResult = {
 
 function useAdminPassword() {
   return useSyncExternalStore(
-    subscribeToNothing,
+    subscribePassword,
     () => sessionStorage.getItem(ADMIN_PW_KEY) ?? '',
     () => null
   );
 }
 
+function useAdminRole() {
+  return useSyncExternalStore(
+    subscribePassword,
+    () => sessionStorage.getItem(ADMIN_ROLE_KEY) ?? 'admin',
+    () => 'admin'
+  );
+}
+
 export default function CheckinPage() {
   const password = useAdminPassword();
+  const role = useAdminRole();
+  const [loginPw, setLoginPw] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [stats, setStats] = useState<CheckinStats | null>(null);
+  const [statsTick, setStatsTick] = useState(0);
+
+  // Login direto na portaria (aceita a senha de admin ou a senha só de portaria)
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!loginPw) return;
+    setLoggingIn(true);
+    setLoginError(null);
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: loginPw }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) storeSession(loginPw, data.role ?? 'admin');
+      else setLoginError(data.error || 'Senha incorreta.');
+    } catch {
+      setLoginError('Não foi possível comunicar com o servidor.');
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  // Contador ao vivo: atualiza a cada 20 s e depois de cada check-in
+  useEffect(() => {
+    if (!password) return;
+    let cancelled = false;
+    const load = () =>
+      fetch('/api/admin/checkin', { headers: { 'x-admin-password': password } })
+        .then((r) => r.json())
+        .then((data) => {
+          if (!cancelled && data.success) setStats(data.stats as CheckinStats);
+        })
+        .catch(() => {});
+    void load();
+    const timer = setInterval(load, 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [password, statsTick]);
   const [ticketCode, setTicketCode] = useState('');
   const [result, setResult] = useState<CheckinResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -72,7 +155,10 @@ export default function CheckinPage() {
         });
         const data = (await response.json()) as CheckinResult;
         setResult(data);
-        if (data.success) setTicketCode('');
+        if (data.success) {
+          setTicketCode('');
+          setStatsTick((n) => n + 1);
+        }
       } catch {
         setResult({ success: false, error: 'Não foi possível comunicar com o servidor.' });
       } finally {
@@ -117,14 +203,33 @@ export default function CheckinPage() {
     return (
       <div className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] flex items-center justify-center p-4">
         <div className="bg-[#141418] border border-[#1F1F24] p-8 max-w-sm w-full text-center shadow-2xl">
-          <span className="font-data text-[10px] uppercase text-[#8A3CFF] tracking-widest block mb-2">{'// AUTENTICAÇÃO NECESSÁRIA'}</span>
-          <h1 className="font-persona text-3xl uppercase mb-4">ACESSO RESTRITO</h1>
-          <p className="text-xs text-[#5B5B66] font-data mb-6">Faça login primeiro no painel principal.</p>
-          <Link href="/admin" className="block bg-[#8A3CFF] text-[#0B0B0D] font-persona text-lg py-3 uppercase">Ir para o Login Admin →</Link>
+          <span className="font-data text-[10px] uppercase text-[#8A3CFF] tracking-widest block mb-2">{'// PORTARIA'}</span>
+          <h1 className="font-persona text-3xl uppercase mb-2">ACESSO RESTRITO</h1>
+          <p className="text-xs text-[#5B5B66] font-data mb-6">Use a senha da portaria (ou a de administrador).</p>
+          <form onSubmit={handleLogin} className="space-y-3 font-data">
+            <div className="relative">
+              <Lock className="w-4 h-4 text-[#5B5B66] absolute left-3 top-3.5" />
+              <input
+                type="password"
+                value={loginPw}
+                onChange={(event) => setLoginPw(event.target.value)}
+                placeholder="Senha"
+                autoFocus
+                className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#8A3CFF] outline-none pl-10 pr-3 py-3 text-sm"
+              />
+            </div>
+            {loginError && <p className="text-xs text-red-300">{loginError}</p>}
+            <button type="submit" disabled={loggingIn || !loginPw} className="w-full bg-[#8A3CFF] disabled:opacity-50 text-[#0B0B0D] font-persona text-lg py-3 uppercase">
+              {loggingIn ? 'Entrando...' : 'Entrar na portaria'}
+            </button>
+          </form>
+          <Link href="/admin" className="block mt-4 text-[10px] font-data uppercase tracking-wider text-[#5B5B66] hover:text-[#E8E8EF]">Painel completo →</Link>
         </div>
       </div>
     );
   }
+
+  const isCheckinOnly = role === 'checkin';
 
   const accepted = result?.success;
   const wasUsed = result?.status === 'already_checked_in';
@@ -133,15 +238,43 @@ export default function CheckinPage() {
     <main className="min-h-screen bg-[#0B0B0D] text-[#E8E8EF] p-4 pb-28 md:p-8">
       <header className="max-w-4xl mx-auto border-b border-[#1F1F24] pb-6 mb-8">
         <div className="flex items-center gap-3">
-          <Link href="/admin" className="p-1.5 bg-[#141418] border border-[#1F1F24] hover:border-[#8A3CFF] text-[#5B5B66] hover:text-[#E8E8EF]" title="Voltar"><ArrowLeft className="w-4 h-4" /></Link>
+          {!isCheckinOnly && (
+            <Link href="/admin" className="p-1.5 bg-[#141418] border border-[#1F1F24] hover:border-[#8A3CFF] text-[#5B5B66] hover:text-[#E8E8EF]" title="Voltar"><ArrowLeft className="w-4 h-4" /></Link>
+          )}
           <PersonaMaskIcon className="w-5 h-3.5" fillColor="#8A3CFF" />
-          <div>
-            <h1 className="font-persona text-3xl uppercase tracking-tight">BAILE DA LAGOA <span className="text-[#8A3CFF]">{'// PORTARIA'}</span></h1>
-            <p className="font-data text-[10px] text-[#5B5B66] uppercase tracking-widest mt-0.5">VALIDAÇÃO DE INGRESSOS</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="font-persona text-2xl md:text-3xl uppercase tracking-tight">BAILE DA LAGOA <span className="text-[#8A3CFF]">{'// PORTARIA'}</span></h1>
+            <p className="font-data text-[10px] text-[#5B5B66] uppercase tracking-widest mt-0.5">VALIDAÇÃO DE INGRESSOS{isCheckinOnly ? ' · ACESSO DE PORTARIA' : ''}</p>
           </div>
+          {isCheckinOnly && (
+            <button onClick={() => storeSession(null, null)} className="p-1.5 bg-[#141418] border border-[#1F1F24] hover:border-red-800 text-[#5B5B66] hover:text-red-300" title="Sair"><LogOut className="w-4 h-4" /></button>
+          )}
         </div>
-        <AdminNavTabs activeTab="checkin" />
+        {!isCheckinOnly && <AdminNavTabs activeTab="checkin" />}
       </header>
+
+      {/* CONTADOR AO VIVO */}
+      <section className="max-w-xl mx-auto mb-4 grid grid-cols-3 gap-2 font-data">
+        <div className="col-span-3 sm:col-span-1 bg-[#141418] border border-sky-400/40 p-4">
+          <span className="text-[9px] uppercase tracking-widest text-[#5B5B66] flex items-center gap-1"><Users className="w-3 h-3 text-sky-400" /> Na festa</span>
+          <div className="font-persona text-4xl text-sky-400 mt-1">
+            {stats ? stats.checkedIn : '—'}<span className="text-[#5B5B66] text-lg"> / {stats ? stats.total : '—'}</span>
+          </div>
+          <span className="text-[9px] text-[#5B5B66]">ingressos válidos</span>
+        </div>
+        <div className="bg-[#141418] border border-[#1F1F24] p-4">
+          <span className="text-[9px] uppercase tracking-widest text-[#5B5B66]">Faltam</span>
+          <div className="font-persona text-3xl text-[#E8E8EF] mt-1">{stats ? stats.remaining : '—'}</div>
+        </div>
+        <div className="bg-[#141418] border border-[#1F1F24] p-4">
+          <span className="text-[9px] uppercase tracking-widest text-[#5B5B66]">Últimos 15 min</span>
+          <div className="font-persona text-3xl text-[#E8E8EF] mt-1">{stats ? stats.last15min : '—'}</div>
+        </div>
+        <div className="bg-[#141418] border border-[#1F1F24] p-4">
+          <span className="text-[9px] uppercase tracking-widest text-[#5B5B66]">Cortesias</span>
+          <div className="font-persona text-3xl text-[#F5C400] mt-1">{stats ? `${stats.courtesyIn}/${stats.courtesyTotal}` : '—'}</div>
+        </div>
+      </section>
 
       <section className="max-w-xl mx-auto bg-[#141418] border border-[#1F1F24] p-5 md:p-8 shadow-2xl">
         <div className="text-center mb-6">

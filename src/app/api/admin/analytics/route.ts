@@ -36,6 +36,37 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
+    // Receita: pedidos pagos (valor efetivamente pago), por lote e por dia
+    const { data: paidOrders } = await supabase
+      .from('payment_orders')
+      .select('amount_cents, paid_amount_cents, paid_at, created_at, provider, ticket_lots(sort_order)')
+      .eq('status', 'paid');
+    const revenueByLotMap = new Map<string, { count: number; cents: number }>();
+    const revenueByDayMap = new Map<string, { count: number; cents: number }>();
+    let revenueCents = 0;
+    let mismatchCount = 0;
+    for (const order of paidOrders ?? []) {
+      const cents = order.paid_amount_cents ?? order.amount_cents;
+      revenueCents += cents;
+      if (order.paid_amount_cents !== null && order.paid_amount_cents < order.amount_cents) mismatchCount += 1;
+      const lot = order.ticket_lots as unknown as { sort_order: number } | null;
+      const lotKey = lot ? `${lot.sort_order}º LOTE` : 'SEM LOTE';
+      const l = revenueByLotMap.get(lotKey) ?? { count: 0, cents: 0 };
+      l.count += 1; l.cents += cents; revenueByLotMap.set(lotKey, l);
+      const day = new Date(order.paid_at ?? order.created_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      const d = revenueByDayMap.get(day) ?? { count: 0, cents: 0 };
+      d.count += 1; d.cents += cents; revenueByDayMap.set(day, d);
+    }
+    const paidOrdersCount = (paidOrders ?? []).length;
+    const revenue = {
+      totalCents: revenueCents,
+      ticketsSold: paidOrdersCount,
+      averageTicketCents: paidOrdersCount > 0 ? Math.round(revenueCents / paidOrdersCount) : 0,
+      mismatchCount,
+      byLot: Array.from(revenueByLotMap.entries()).sort().map(([lot, v]) => ({ lot, ...v })),
+      byDay: Array.from(revenueByDayMap.entries()).map(([day, v]) => ({ day, ...v })),
+    };
+
     // Cortesias ficam fora do funil de conversão (não são inscritos que pagaram)
     const courtesyCount = (leads || []).filter((l) => l.ticket_kind === 'courtesy').length;
     const allLeads = (leads || []).filter((l) => l.ticket_kind !== 'courtesy');
@@ -211,6 +242,8 @@ export async function GET(req: NextRequest) {
         ageDistribution,
         funnel,
         campaignAttribution,
+        revenue,
+        checkinCount,
       },
     });
   } catch (err: any) {
