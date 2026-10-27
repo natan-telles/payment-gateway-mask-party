@@ -49,6 +49,12 @@ CREATE INDEX IF NOT EXISTS idx_waiting_queue_email ON public.waiting_queue (emai
 CREATE INDEX IF NOT EXISTS idx_waiting_queue_ticket_code ON public.waiting_queue (ticket_code);
 CREATE INDEX IF NOT EXISTS idx_waiting_queue_payment_status ON public.waiting_queue (payment_status);
 
+-- Tipo do ingresso: 'paid' (comprado) ou 'courtesy' (cortesia emitida pelo admin).
+-- Declarado aqui para a função de check-in abaixo poder devolvê-lo.
+ALTER TABLE public.waiting_queue ADD COLUMN IF NOT EXISTS ticket_kind TEXT DEFAULT 'paid' NOT NULL
+    CHECK (ticket_kind IN ('paid', 'courtesy'));
+ALTER TABLE public.waiting_queue ADD COLUMN IF NOT EXISTS courtesy_note TEXT;
+
 -- Check-in atômico: a linha do ingresso fica bloqueada enquanto é validada.
 -- Isso impede que duas portarias aprovem o mesmo QR Code ao mesmo tempo.
 CREATE OR REPLACE FUNCTION public.check_in_ticket(p_ticket_code TEXT)
@@ -67,7 +73,7 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'status', 'invalid', 'error', 'Código do ingresso é obrigatório.');
     END IF;
 
-    SELECT id, name, ticket_code, payment_status, ticket_status, checkin_status, checkin_at
+    SELECT id, name, ticket_code, payment_status, ticket_status, checkin_status, checkin_at, ticket_kind
     INTO v_lead
     FROM public.waiting_queue
     WHERE ticket_code = v_code
@@ -88,6 +94,7 @@ BEGIN
             'error', 'Este ingresso já foi utilizado.',
             'name', v_lead.name,
             'ticket_code', v_lead.ticket_code,
+            'ticket_kind', v_lead.ticket_kind,
             'checkin_at', v_lead.checkin_at
         );
     END IF;
@@ -103,6 +110,7 @@ BEGIN
         'status', 'checked_in',
         'name', v_lead.name,
         'ticket_code', v_lead.ticket_code,
+        'ticket_kind', v_lead.ticket_kind,
         'checkin_at', now()
     );
 END;
@@ -500,3 +508,118 @@ CREATE INDEX IF NOT EXISTS idx_notification_logs_level ON public.notification_lo
 
 -- Somente o Service Role (API do site) lê e escreve
 ALTER TABLE public.notification_logs ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================
+-- 7. INGRESSO CORTESIA
+-- Emitido só pelo admin. Vira uma linha normal na waiting_queue com
+-- payment_status = 'approved' e ticket_kind = 'courtesy', código no padrão
+-- BDL-C-XXXXXX. Não cria payment_orders, então NÃO ocupa vaga de lote.
+-- A portaria valida igual a um ingresso pago.
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.issue_courtesy_ticket(
+    p_name TEXT,
+    p_phone TEXT,
+    p_email TEXT,
+    p_note TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_lead RECORD;
+    v_code TEXT;
+    v_phone TEXT := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+    v_email TEXT := lower(trim(coalesce(p_email, '')));
+BEGIN
+    IF trim(coalesce(p_name, '')) = '' OR v_phone = '' OR v_email = '' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'missing_fields');
+    END IF;
+
+    -- Reaproveita cadastro existente (mesmo telefone ou e-mail)
+    SELECT id, name, email, phone, queue_position, ticket_code, ticket_kind, payment_status
+    INTO v_lead
+    FROM public.waiting_queue
+    WHERE phone = v_phone OR email = v_email
+    LIMIT 1
+    FOR UPDATE;
+
+    IF FOUND THEN
+        IF v_lead.payment_status = 'approved' AND v_lead.ticket_code IS NOT NULL THEN
+            -- Já tem ingresso (pago ou cortesia): devolve o existente, sem gerar outro
+            RETURN jsonb_build_object(
+                'success', true,
+                'already_issued', true,
+                'id', v_lead.id,
+                'name', v_lead.name,
+                'email', v_lead.email,
+                'phone', v_lead.phone,
+                'queue_position', v_lead.queue_position,
+                'ticket_code', v_lead.ticket_code,
+                'ticket_kind', v_lead.ticket_kind
+            );
+        END IF;
+
+        v_code := 'BDL-C-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
+
+        UPDATE public.waiting_queue
+        SET payment_status = 'approved',
+            payment_date = now(),
+            ticket_status = 'issued',
+            ticket_code = v_code,
+            ticket_kind = 'courtesy',
+            courtesy_note = nullif(trim(coalesce(p_note, '')), ''),
+            notification_status = 'sent',
+            notification_date = coalesce(notification_date, now())
+        WHERE id = v_lead.id;
+
+        RETURN jsonb_build_object(
+            'success', true,
+            'already_issued', false,
+            'reused_lead', true,
+            'id', v_lead.id,
+            'name', v_lead.name,
+            'email', v_lead.email,
+            'phone', v_lead.phone,
+            'queue_position', v_lead.queue_position,
+            'ticket_code', v_code,
+            'ticket_kind', 'courtesy'
+        );
+    END IF;
+
+    v_code := 'BDL-C-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
+
+    INSERT INTO public.waiting_queue (
+        name, phone, email, source,
+        notification_status, notification_date,
+        payment_status, payment_date,
+        ticket_status, ticket_code, ticket_kind, courtesy_note
+    )
+    VALUES (
+        trim(p_name), v_phone, v_email, 'courtesy',
+        'sent', now(),
+        'approved', now(),
+        'issued', v_code, 'courtesy', nullif(trim(coalesce(p_note, '')), '')
+    )
+    RETURNING id, name, email, phone, queue_position INTO v_lead;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'already_issued', false,
+        'reused_lead', false,
+        'id', v_lead.id,
+        'name', v_lead.name,
+        'email', v_lead.email,
+        'phone', v_lead.phone,
+        'queue_position', v_lead.queue_position,
+        'ticket_code', v_code,
+        'ticket_kind', 'courtesy'
+    );
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.issue_courtesy_ticket(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.issue_courtesy_ticket(TEXT, TEXT, TEXT, TEXT) TO service_role;
+
+CREATE INDEX IF NOT EXISTS idx_waiting_queue_ticket_kind ON public.waiting_queue (ticket_kind);

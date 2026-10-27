@@ -16,6 +16,7 @@ type CheckinResult = {
   error?: string;
   name?: string;
   ticket_code?: string;
+  ticket_kind?: 'paid' | 'courtesy';
   checkin_at?: string;
 };
 
@@ -175,6 +176,9 @@ export default function CheckinPage() {
             {accepted ? <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" /> : <CircleAlert className={`w-10 h-10 mx-auto mb-2 ${wasUsed ? 'text-amber-400' : 'text-red-400'}`} />}
             <p className="font-persona text-2xl uppercase">{accepted ? 'ENTRADA LIBERADA' : wasUsed ? 'INGRESSO JÁ UTILIZADO' : 'ENTRADA NÃO LIBERADA'}</p>
             {result.name && <p className="font-data text-base text-[#E8E8EF] mt-2">{result.name}</p>}
+            {result.ticket_kind === 'courtesy' && (
+              <span className="inline-block mt-2 bg-[#F5C400] text-[#0B0B0D] px-2 py-0.5 font-data text-[10px] font-bold tracking-widest">INGRESSO CORTESIA</span>
+            )}
             {result.ticket_code && <p className="font-data text-xs text-[#5B5B66] mt-1">{result.ticket_code}</p>}
             <p className="font-data text-xs text-[#B8B8C1] mt-3">{accepted ? 'Check-in registrado com sucesso.' : result.error || 'Não foi possível validar este ingresso.'}</p>
             {result.checkin_at && <p className="font-data text-[10px] text-[#5B5B66] mt-2">{new Date(result.checkin_at).toLocaleString('pt-BR')}</p>}

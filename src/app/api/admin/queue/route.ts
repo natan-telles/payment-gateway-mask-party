@@ -46,7 +46,19 @@ export async function GET(req: NextRequest) {
       query = query.eq('notification_status', notificationStatus);
     }
 
-    if (paymentStatus && paymentStatus !== 'all') {
+    if (paymentStatus === 'expired') {
+      // "Expirado" na prática = ainda não pagou e o prazo de pagamento venceu.
+      // Ninguém grava payment_status = 'expired' automaticamente (só manualmente),
+      // por isso o filtro antigo (eq 'expired') nunca retornava nada.
+      const now = new Date().toISOString();
+      query = query.or(`payment_status.eq.expired,and(payment_status.eq.pending,payment_deadline.lt.${now})`);
+    } else if (paymentStatus === 'pending') {
+      // Pendente = liberado ou não, mas ainda dentro do prazo (ou sem prazo)
+      const now = new Date().toISOString();
+      query = query.eq('payment_status', 'pending').or(`payment_deadline.is.null,payment_deadline.gte.${now}`);
+    } else if (paymentStatus === 'courtesy') {
+      query = query.eq('ticket_kind', 'courtesy');
+    } else if (paymentStatus && paymentStatus !== 'all') {
       query = query.eq('payment_status', paymentStatus);
     }
 
@@ -63,8 +75,14 @@ export async function GET(req: NextRequest) {
     // Calcula métricas resumidas
     const total = leads?.length || 0;
     const notifiedCount = leads?.filter((l) => l.notification_status === 'sent').length || 0;
-    const paidCount = leads?.filter((l) => l.payment_status === 'approved').length || 0;
-    const pendingPaymentCount = leads?.filter((l) => l.payment_status === 'pending').length || 0;
+    const paidCount = leads?.filter((l) => l.payment_status === 'approved' && l.ticket_kind !== 'courtesy').length || 0;
+    const courtesyCount = leads?.filter((l) => l.ticket_kind === 'courtesy').length || 0;
+    const nowMs = Date.now();
+    const isExpired = (l: { payment_status: string; payment_deadline: string | null }) =>
+      l.payment_status === 'expired' ||
+      (l.payment_status === 'pending' && Boolean(l.payment_deadline) && new Date(l.payment_deadline as string).getTime() < nowMs);
+    const expiredCount = leads?.filter(isExpired).length || 0;
+    const pendingPaymentCount = leads?.filter((l) => l.payment_status === 'pending' && !isExpired(l)).length || 0;
 
     return NextResponse.json({
       success: true,
@@ -73,6 +91,8 @@ export async function GET(req: NextRequest) {
         total,
         notifiedCount,
         paidCount,
+        courtesyCount,
+        expiredCount,
         pendingPaymentCount,
       },
     });
