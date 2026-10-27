@@ -82,7 +82,10 @@ export async function GET(req: NextRequest) {
 
     const [lotsRes, ordersRes, currentRes] = await Promise.all([
       supabase.from('ticket_lots').select('*').order('sort_order', { ascending: true }),
-      supabase.from('payment_orders').select('lot_id, status, reserved_until').in('status', ['paid', 'reserved']),
+      supabase
+        .from('payment_orders')
+        .select('lot_id, status, reserved_until, amount_cents, paid_amount_cents, waiting_queue(name, phone)')
+        .in('status', ['paid', 'reserved']),
       supabase.rpc('current_ticket_lot').maybeSingle(),
     ]);
 
@@ -93,28 +96,45 @@ export async function GET(req: NextRequest) {
 
     // Mesma regra de ocupação do banco: pagos + reservas ainda válidas
     const now = Date.now();
-    const counts = new Map<string, { sold: number; reserved: number }>();
+    const counts = new Map<string, { sold: number; reserved: number; revenueCents: number }>();
+    // Reservas ativas agora (gente na tela do Pix neste minuto), com nome e minutos restantes
+    const activeReservations: Array<{ lot_id: string; name: string; phone: string; amount_cents: number; reserved_until: string; minutes_left: number }> = [];
     for (const order of ordersRes.data ?? []) {
-      const entry = counts.get(order.lot_id) ?? { sold: 0, reserved: 0 };
-      if (order.status === 'paid') entry.sold += 1;
-      else if (Date.parse(order.reserved_until) > now) entry.reserved += 1;
+      const entry = counts.get(order.lot_id) ?? { sold: 0, reserved: 0, revenueCents: 0 };
+      if (order.status === 'paid') {
+        entry.sold += 1;
+        entry.revenueCents += order.paid_amount_cents ?? order.amount_cents;
+      } else if (Date.parse(order.reserved_until) > now) {
+        entry.reserved += 1;
+        const lead = order.waiting_queue as unknown as { name: string; phone: string } | null;
+        activeReservations.push({
+          lot_id: order.lot_id,
+          name: lead?.name ?? '—',
+          phone: lead?.phone ?? '',
+          amount_cents: order.amount_cents,
+          reserved_until: order.reserved_until,
+          minutes_left: Math.max(0, Math.round((Date.parse(order.reserved_until) - now) / 60000)),
+        });
+      }
       counts.set(order.lot_id, entry);
     }
+    activeReservations.sort((a, b) => a.minutes_left - b.minutes_left);
 
     const currentLotId = (currentRes.data as { id: string } | null)?.id ?? null;
 
     const lots = (lotsRes.data ?? []).map((lot) => {
-      const { sold, reserved } = counts.get(lot.id) ?? { sold: 0, reserved: 0 };
+      const { sold, reserved, revenueCents } = counts.get(lot.id) ?? { sold: 0, reserved: 0, revenueCents: 0 };
       return {
         ...lot,
         sold,
         reserved,
+        revenue_cents: revenueCents,
         available: Math.max(0, lot.capacity - sold - reserved),
         is_current: lot.id === currentLotId,
       };
     });
 
-    return NextResponse.json({ success: true, data: lots });
+    return NextResponse.json({ success: true, data: lots, activeReservations });
   } catch (err) {
     return NextResponse.json({ success: false, error: err instanceof Error ? err.message : 'Erro ao carregar lotes' }, { status: 500 });
   }
