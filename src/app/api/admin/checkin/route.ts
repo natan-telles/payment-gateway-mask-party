@@ -13,6 +13,7 @@ type CheckinResult = {
   error?: string;
   name?: string;
   ticket_code?: string;
+  ticket_kind?: 'paid' | 'courtesy';
   checkin_at?: string;
 };
 
@@ -30,7 +31,7 @@ async function checkInWithoutRpc(ticketCode: string): Promise<CheckinResult> {
     .eq('payment_status', 'approved')
     .eq('ticket_status', 'issued')
     .eq('checkin_status', false)
-    .select('name, ticket_code, checkin_at')
+    .select('name, ticket_code, checkin_at, ticket_kind')
     .maybeSingle();
 
   if (updateError) throw updateError;
@@ -40,7 +41,7 @@ async function checkInWithoutRpc(ticketCode: string): Promise<CheckinResult> {
 
   const { data: ticket, error: lookupError } = await supabase
     .from('waiting_queue')
-    .select('name, ticket_code, payment_status, ticket_status, checkin_status, checkin_at')
+    .select('name, ticket_code, payment_status, ticket_status, checkin_status, checkin_at, ticket_kind')
     .eq('ticket_code', normalizedCode)
     .maybeSingle();
 
@@ -53,6 +54,7 @@ async function checkInWithoutRpc(ticketCode: string): Promise<CheckinResult> {
       error: 'Este ingresso já foi utilizado.',
       name: ticket.name,
       ticket_code: ticket.ticket_code,
+      ticket_kind: ticket.ticket_kind,
       checkin_at: ticket.checkin_at,
     };
   }

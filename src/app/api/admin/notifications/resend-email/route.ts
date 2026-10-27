@@ -6,6 +6,7 @@ import {
   sendReminderEmail,
   sendTicketEmail,
 } from '@/lib/notifications/email';
+import { buildTicketPdfAttachment, getPaidLotName } from '@/lib/tickets/pdf';
 
 function checkAdminAuth(req: NextRequest) {
   const authHeader = req.headers.get('x-admin-password');
@@ -97,15 +98,30 @@ export async function POST(req: NextRequest) {
         });
         break;
 
-      case 'ticket':
+      case 'ticket': {
+        if (record.payment_status !== 'approved' || !record.ticket_code) {
+          return NextResponse.json(
+            { success: false, error: 'Este cadastro ainda não tem ingresso emitido (pagamento não aprovado).' },
+            { status: 409 }
+          );
+        }
+        const kind: 'paid' | 'courtesy' = record.ticket_kind === 'courtesy' ? 'courtesy' : 'paid';
+        const ticketLot = kind === 'paid' ? await getPaidLotName(record.id) : 'CORTESIA';
+        const pdf = await buildTicketPdfAttachment(
+          { name: record.name, email: targetEmail, ticketCode: record.ticket_code, kind, lotName: ticketLot, note: record.courtesy_note },
+          record.id
+        );
         result = await sendTicketEmail({
           to: targetEmail,
           name: record.name,
           leadId: record.id,
-          ticketCode: record.ticket_code || `MASK-${record.queue_position}`,
-          lotName,
+          ticketCode: record.ticket_code,
+          lotName: ticketLot,
+          kind,
+          pdf,
         });
         break;
+      }
 
       default:
         return NextResponse.json(
