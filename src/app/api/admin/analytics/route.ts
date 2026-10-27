@@ -36,7 +36,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    const allLeads = leads || [];
+    // Cortesias ficam fora do funil de conversão (não são inscritos que pagaram)
+    const courtesyCount = (leads || []).filter((l) => l.ticket_kind === 'courtesy').length;
+    const allLeads = (leads || []).filter((l) => l.ticket_kind !== 'courtesy');
     const totalLeads = allLeads.length;
 
     // 1. REGISTRATIONS BY DAY (Inscrições por Dia)
@@ -201,6 +203,7 @@ export async function GET(req: NextRequest) {
           totalLeads,
           notifiedCount,
           paidCount,
+          courtesyCount,
           averageAge,
         },
         byDay,

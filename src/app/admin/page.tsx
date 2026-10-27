@@ -22,6 +22,8 @@ import {
   CalendarClock,
   CheckSquare,
   Square,
+  Gift,
+  FileDown,
 } from 'lucide-react';
 import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { AdminNavTabs } from '@/components/AdminNavTabs';
@@ -66,6 +68,8 @@ export default function AdminPage() {
     total: 0,
     notifiedCount: 0,
     paidCount: 0,
+    courtesyCount: 0,
+    expiredCount: 0,
     pendingPaymentCount: 0,
   });
 
@@ -97,6 +101,20 @@ export default function AdminPage() {
   const [isSavingDeadline, setIsSavingDeadline] = useState(false);
   const [deadlineFeedback, setDeadlineFeedback] = useState<string | null>(null);
   const [deadlineOpenedAt, setDeadlineOpenedAt] = useState(0);
+
+  // Ingresso cortesia (só o admin emite)
+  const [isCourtesyModalOpen, setIsCourtesyModalOpen] = useState(false);
+  const [courtesyForm, setCourtesyForm] = useState({ name: '', phone: '', email: '', note: '', sendEmail: true });
+  const [isIssuingCourtesy, setIsIssuingCourtesy] = useState(false);
+  const [courtesyResult, setCourtesyResult] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    ticketCode?: string;
+    leadId?: string;
+    name?: string;
+    phone?: string;
+  } | null>(null);
+  const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null);
 
   const [isTestEmailModalOpen, setIsTestEmailModalOpen] = useState(false);
   const [testEmailTo, setTestEmailTo] = useState('');
@@ -364,6 +382,103 @@ export default function AdminPage() {
     } finally {
       setIsSavingDeadline(false);
     }
+  };
+
+  // Baixa o PDF do ingresso (rota protegida pela senha do admin, por isso via fetch + blob)
+  const handleDownloadPdf = async (leadId: string, ticketCode: string) => {
+    setDownloadingPdfId(leadId);
+    try {
+      const res = await fetch(`/api/admin/tickets/pdf?lead=${encodeURIComponent(leadId)}`, {
+        headers: { 'x-admin-password': password },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Não foi possível gerar o PDF.');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ingresso-baile-da-lagoa-${ticketCode}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Erro de conexão ao gerar o PDF.');
+    } finally {
+      setDownloadingPdfId(null);
+    }
+  };
+
+  const openCourtesyModal = () => {
+    setCourtesyForm({ name: '', phone: '', email: '', note: '', sendEmail: true });
+    setCourtesyResult(null);
+    setIsCourtesyModalOpen(true);
+  };
+
+  const handleIssueCourtesy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { name, phone, email, note, sendEmail } = courtesyForm;
+    if (!name.trim() || phone.replace(/\D/g, '').length < 10 || !email.includes('@')) {
+      setCourtesyResult({ type: 'error', message: 'Preencha nome, WhatsApp com DDD e um e-mail válido.' });
+      return;
+    }
+
+    setIsIssuingCourtesy(true);
+    setCourtesyResult(null);
+    try {
+      const res = await fetch('/api/admin/courtesy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ name, phone, email, note, sendEmail }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const t = data.ticket as { id: string; name: string; phone: string; ticket_code: string };
+        let message: string;
+        if (data.alreadyPaid) message = data.message;
+        else if (data.alreadyIssued) message = `${t.name} já tinha cortesia emitida (${t.ticket_code}). Nenhum código novo foi gerado.`;
+        else message = `Cortesia ${t.ticket_code} emitida para ${t.name}${data.reusedLead ? ' (cadastro já existente na fila)' : ''}.`;
+        if (sendEmail && !data.alreadyPaid) {
+          message += data.emailSent ? ' E-mail com QR Code e PDF enviado.' : ` E-mail FALHOU${data.emailError ? `: ${data.emailError}` : ''} — baixe o PDF e envie manualmente.`;
+        }
+        setCourtesyResult({ type: 'success', message, ticketCode: t.ticket_code, leadId: t.id, name: t.name, phone: t.phone });
+        fetchLeads();
+      } else {
+        setCourtesyResult({ type: 'error', message: data.error || 'Falha ao emitir cortesia.' });
+      }
+    } catch {
+      setCourtesyResult({ type: 'error', message: 'Erro de conexão ao emitir cortesia.' });
+    } finally {
+      setIsIssuingCourtesy(false);
+    }
+  };
+
+  const courtesyWhatsAppUrl = (phone: string, name: string, ticketCode: string) => {
+    const raw = phone.replace(/\D/g, '');
+    const withDdi = raw.startsWith('55') ? raw : `55${raw}`;
+    const url = new URL(`https://wa.me/${withDdi}`);
+    url.searchParams.set(
+      'text',
+      [
+        `Olá, ${name.split(' ')[0]}! 🎭`,
+        '',
+        'Você ganhou um *ingresso cortesia* para o *BAILE DA LAGOA (31.10 · SJC)*.',
+        '',
+        `Seu código: *${ticketCode}*`,
+        'O ingresso em PDF, com o QR Code para a portaria, foi enviado para o seu e-mail. Qualquer dúvida é só chamar.',
+        '',
+        '📍 Av. Gen. Motors, 1159 - Ronda, São José dos Campos · 20h',
+        '🎭 Sem máscara, sem entrada.',
+        '',
+        '📲 Grupo oficial da festa:',
+        WHATSAPP_GROUP_URL,
+      ].join('\n')
+    );
+    return url.toString();
   };
 
   // Consulta a cota do Resend (usada no modal de liberação)
@@ -680,13 +795,17 @@ export default function AdminPage() {
           <div className="bg-[#141418] border border-[#1F1F24] p-4">
             <span className="text-[10px] text-[#5B5B66] uppercase block">PAGOS / INGRESSOS</span>
             <div className="font-persona text-4xl text-emerald-400 mt-1">{metrics.paidCount}</div>
-            <span className="text-[9px] text-[#5B5B66] block mt-1">PIX confirmados</span>
+            <span className="text-[9px] text-[#5B5B66] block mt-1">
+              PIX confirmados{metrics.courtesyCount > 0 ? ` · +${metrics.courtesyCount} cortesia(s)` : ''}
+            </span>
           </div>
 
           <div className="bg-[#141418] border border-[#1F1F24] p-4">
             <span className="text-[10px] text-[#5B5B66] uppercase block">PAGTO. PENDENTE</span>
             <div className="font-persona text-4xl text-[#FF2E3B] mt-1">{metrics.pendingPaymentCount}</div>
-            <span className="text-[9px] text-[#5B5B66] block mt-1">Aguardando PIX</span>
+            <span className="text-[9px] text-[#5B5B66] block mt-1">
+              Aguardando PIX{metrics.expiredCount > 0 ? ` · ${metrics.expiredCount} com prazo vencido` : ''}
+            </span>
           </div>
         </div>
 
@@ -739,6 +858,14 @@ export default function AdminPage() {
               <Mail className="w-3.5 h-3.5 text-[#8A3CFF]" />
               <span>Enviar Email</span>
             </button>
+
+            <button
+              onClick={openCourtesyModal}
+              className="bg-[#141418] hover:bg-[#1f1f24] text-[#E8E8EF] py-3 md:py-2.5 px-3.5 uppercase text-xs tracking-wider border border-[#1F1F24] hover:border-[#F5C400]/60 flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Gift className="w-3.5 h-3.5 text-[#F5C400]" />
+              <span>Cortesia</span>
+            </button>
           </div>
         </div>
 
@@ -780,7 +907,8 @@ export default function AdminPage() {
               <option value="all">Pagamento: Todos</option>
               <option value="pending">Pendente</option>
               <option value="approved">Aprovado</option>
-              <option value="expired">Expirado</option>
+              <option value="expired">Expirado (prazo vencido)</option>
+              <option value="courtesy">Cortesia</option>
             </select>
 
             <select
@@ -846,11 +974,27 @@ export default function AdminPage() {
                       <span className="font-persona text-lg text-[#8A3CFF] leading-none">
                         #{String(lead.queue_position).padStart(4, '0')}
                       </span>
-                      <strong className="block uppercase text-[#E8E8EF] text-sm truncate mt-0.5">{lead.name}</strong>
+                      <strong className="block uppercase text-[#E8E8EF] text-sm truncate mt-0.5">
+                        {lead.name}
+                        {lead.ticket_kind === 'courtesy' && (
+                          <span className="ml-1.5 align-middle bg-[#F5C400] text-[#0B0B0D] px-1 py-0.5 text-[8px] font-bold tracking-wider">CORTESIA</span>
+                        )}
+                      </strong>
                       <span className="block text-[10px] text-[#5B5B66] lowercase truncate">{lead.email}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {isPaid && lead.ticket_code && (
+                        <button
+                          onClick={() => handleDownloadPdf(lead.id, lead.ticket_code as string)}
+                          disabled={downloadingPdfId === lead.id}
+                          className="p-2.5 bg-[#F5C400]/15 active:bg-[#F5C400] text-[#F5C400] disabled:opacity-50 transition-colors"
+                          title="Baixar ingresso em PDF"
+                          aria-label="Baixar ingresso em PDF"
+                        >
+                          <FileDown className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => openDeadlineModal([lead.id])}
                         className="p-2.5 bg-[#8A3CFF]/15 active:bg-[#8A3CFF] text-[#B48CFF] transition-colors"
@@ -978,6 +1122,9 @@ export default function AdminPage() {
                       <td className="p-3">
                         <strong className="block uppercase text-[#E8E8EF] text-xs">
                           {lead.name}
+                          {lead.ticket_kind === 'courtesy' && (
+                            <span className="ml-1.5 bg-[#F5C400] text-[#0B0B0D] px-1 py-0.5 text-[8px] font-bold tracking-wider">CORTESIA</span>
+                          )}
                         </strong>
                         <span className="text-[10px] text-[#5B5B66] lowercase">{lead.email}</span>
                       </td>
@@ -1060,6 +1207,16 @@ export default function AdminPage() {
 
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          {isPaid && lead.ticket_code && (
+                            <button
+                              onClick={() => handleDownloadPdf(lead.id, lead.ticket_code as string)}
+                              disabled={downloadingPdfId === lead.id}
+                              className="p-1.5 bg-[#F5C400]/15 hover:bg-[#F5C400] text-[#F5C400] hover:text-[#0B0B0D] disabled:opacity-50 transition-colors"
+                              title="Baixar ingresso em PDF"
+                            >
+                              <FileDown className="w-3 h-3" />
+                            </button>
+                          )}
                           <button
                             onClick={() => openDeadlineModal([lead.id])}
                             className="p-1.5 bg-[#8A3CFF]/15 hover:bg-[#8A3CFF] text-[#B48CFF] hover:text-[#0B0B0D] transition-colors"
@@ -1092,6 +1249,124 @@ export default function AdminPage() {
           </table>
         </div>
       </div>
+
+      {/* MODAL DE INGRESSO CORTESIA */}
+      {isCourtesyModalOpen && (
+        <div className="fixed inset-0 bg-[#0B0B0D]/90 backdrop-blur-md z-50 flex items-center justify-center p-4 font-data">
+          <div className="bg-[#141418] text-[#E8E8EF] border border-[#1F1F24] w-full max-w-md p-5 md:p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setIsCourtesyModalOpen(false)}
+              className="absolute top-4 right-4 text-[#5B5B66] hover:text-[#E8E8EF] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <span className="text-[9px] uppercase text-[#F5C400] tracking-widest block mb-1">
+              {'// CONVIDADOS'}
+            </span>
+            <h3 className="font-persona text-2xl uppercase tracking-tight mb-2">
+              EMITIR INGRESSO CORTESIA
+            </h3>
+            <p className="text-xs text-[#5B5B66] mb-5">
+              Gera um código <strong className="text-[#E8E8EF]">BDL-C-XXXXXX</strong> válido na portaria. Não ocupa vaga de lote e não entra na receita. O ingresso em PDF vai por e-mail.
+            </p>
+
+            {courtesyResult && (
+              <div className={`mb-4 p-3 border text-xs ${courtesyResult.type === 'success' ? 'bg-[#0B0B0D] border-[#F5C400]/60' : 'bg-red-950/20 border-red-500/40 text-red-200'}`}>
+                <p>{courtesyResult.message}</p>
+                {courtesyResult.type === 'success' && courtesyResult.ticketCode && courtesyResult.leadId && (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadPdf(courtesyResult.leadId as string, courtesyResult.ticketCode as string)}
+                      disabled={downloadingPdfId === courtesyResult.leadId}
+                      className="bg-[#F5C400] text-[#0B0B0D] font-bold py-2.5 uppercase text-[10px] tracking-wider flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <FileDown className="w-3.5 h-3.5" /> Baixar PDF
+                    </button>
+                    <a
+                      href={courtesyWhatsAppUrl(courtesyResult.phone ?? '', courtesyResult.name ?? '', courtesyResult.ticketCode)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 py-2.5 uppercase text-[10px] tracking-wider flex items-center justify-center gap-1.5"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Avisar no WhatsApp
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <form onSubmit={handleIssueCourtesy} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">Nome completo *</label>
+                <input
+                  type="text"
+                  value={courtesyForm.name}
+                  onChange={(e) => setCourtesyForm((f) => ({ ...f, name: e.target.value }))}
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#F5C400] text-[#E8E8EF] p-2.5 outline-none"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">WhatsApp (com DDD) *</label>
+                  <input
+                    type="tel"
+                    value={courtesyForm.phone}
+                    onChange={(e) => setCourtesyForm((f) => ({ ...f, phone: e.target.value }))}
+                    placeholder="12 99999-9999"
+                    className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#F5C400] text-[#E8E8EF] p-2.5 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">E-mail * (recebe o PDF)</label>
+                  <input
+                    type="email"
+                    value={courtesyForm.email}
+                    onChange={(e) => setCourtesyForm((f) => ({ ...f, email: e.target.value }))}
+                    className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#F5C400] text-[#E8E8EF] p-2.5 outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">Observação (ex.: banda, equipe, convidado)</label>
+                <input
+                  type="text"
+                  value={courtesyForm.note}
+                  onChange={(e) => setCourtesyForm((f) => ({ ...f, note: e.target.value }))}
+                  className="w-full bg-[#0B0B0D] border border-[#1F1F24] focus:border-[#F5C400] text-[#E8E8EF] p-2.5 outline-none"
+                />
+              </div>
+
+              <label className="flex items-start gap-2 text-[10px] text-[#8C8C9A] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={courtesyForm.sendEmail}
+                  onChange={(e) => setCourtesyForm((f) => ({ ...f, sendEmail: e.target.checked }))}
+                  className="mt-0.5 accent-[#F5C400]"
+                />
+                <span>Enviar agora o e-mail com QR Code e PDF (gasta 1 e-mail da cota do Resend)</span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={isIssuingCourtesy}
+                className="w-full bg-[#F5C400] hover:bg-[#ffd21a] disabled:opacity-50 text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors"
+              >
+                {isIssuingCourtesy ? (
+                  <span>EMITINDO...</span>
+                ) : (
+                  <>
+                    <Gift className="w-4 h-4" />
+                    <span>EMITIR CORTESIA</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE NOVO PRAZO DE PAGAMENTO */}
       {isDeadlineModalOpen && (

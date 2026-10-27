@@ -19,6 +19,7 @@ interface AnalyticsData {
     totalLeads: number;
     notifiedCount: number;
     paidCount: number;
+    courtesyCount?: number;
     averageAge: number;
   };
   byDay: Array<{
@@ -192,7 +193,9 @@ export default function AnalyticsPage() {
               <div className="font-persona text-4xl text-emerald-400 mt-1">
                 {data.funnel.notifiedConversionRate}%
               </div>
-              <span className="text-[9px] text-[#5B5B66] block mt-1">Notificados &rarr; Pagos</span>
+              <span className="text-[9px] text-[#5B5B66] block mt-1">
+                Notificados &rarr; Pagos{data.summary.courtesyCount ? ` · ${data.summary.courtesyCount} cortesia(s) fora do funil` : ''}
+              </span>
             </div>
 
             <div className="bg-[#141418] border border-[#1F1F24] p-4">
