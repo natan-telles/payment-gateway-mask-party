@@ -10,6 +10,8 @@ import {
   Calendar,
   Share2,
   RefreshCw,
+  Wallet,
+  DoorOpen,
 } from 'lucide-react';
 import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { AdminNavTabs } from '@/components/AdminNavTabs';
@@ -19,6 +21,7 @@ interface AnalyticsData {
     totalLeads: number;
     notifiedCount: number;
     paidCount: number;
+    courtesyCount?: number;
     averageAge: number;
   };
   byDay: Array<{
@@ -55,7 +58,18 @@ interface AnalyticsData {
     paidCount: number;
     conversionRate: number;
   }>;
+  revenue?: {
+    totalCents: number;
+    ticketsSold: number;
+    averageTicketCents: number;
+    mismatchCount: number;
+    byLot: Array<{ lot: string; count: number; cents: number }>;
+    byDay: Array<{ day: string; count: number; cents: number }>;
+  };
+  checkinCount?: number;
 }
+
+const formatBRL = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -192,7 +206,9 @@ export default function AnalyticsPage() {
               <div className="font-persona text-4xl text-emerald-400 mt-1">
                 {data.funnel.notifiedConversionRate}%
               </div>
-              <span className="text-[9px] text-[#5B5B66] block mt-1">Notificados &rarr; Pagos</span>
+              <span className="text-[9px] text-[#5B5B66] block mt-1">
+                Notificados &rarr; Pagos{data.summary.courtesyCount ? ` · ${data.summary.courtesyCount} cortesia(s) fora do funil` : ''}
+              </span>
             </div>
 
             <div className="bg-[#141418] border border-[#1F1F24] p-4">
@@ -203,6 +219,73 @@ export default function AnalyticsPage() {
               <span className="text-[9px] text-[#5B5B66] block mt-1">Perfil do público</span>
             </div>
           </div>
+
+          {/* RECEITA */}
+          {data.revenue && (
+            <div className="bg-[#141418] border border-[#F5C400]/30 p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="w-3.5 h-3.5 text-[#F5C400]" />
+                <span className="font-data text-[10px] uppercase tracking-widest text-[#F5C400]">{'// RECEITA'}</span>
+              </div>
+              <h3 className="font-persona text-2xl uppercase tracking-tight text-[#E8E8EF] mb-4">ARRECADAÇÃO</h3>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-data mb-6">
+                <div className="bg-[#0B0B0D] border border-[#1F1F24] p-4">
+                  <span className="text-[10px] uppercase text-[#5B5B66] block">TOTAL</span>
+                  <div className="font-persona text-3xl text-[#F5C400] mt-1 truncate">{formatBRL(data.revenue.totalCents)}</div>
+                </div>
+                <div className="bg-[#0B0B0D] border border-[#1F1F24] p-4">
+                  <span className="text-[10px] uppercase text-[#5B5B66] block">INGRESSOS VENDIDOS</span>
+                  <div className="font-persona text-3xl text-emerald-400 mt-1">{data.revenue.ticketsSold}</div>
+                  <span className="text-[9px] text-[#5B5B66] block mt-1">{data.summary.courtesyCount ? `+ ${data.summary.courtesyCount} cortesia(s)` : 'pagos no gateway'}</span>
+                </div>
+                <div className="bg-[#0B0B0D] border border-[#1F1F24] p-4">
+                  <span className="text-[10px] uppercase text-[#5B5B66] block">TICKET MÉDIO</span>
+                  <div className="font-persona text-3xl text-[#E8E8EF] mt-1 truncate">{formatBRL(data.revenue.averageTicketCents)}</div>
+                </div>
+                <div className="bg-[#0B0B0D] border border-[#1F1F24] p-4">
+                  <span className="text-[10px] uppercase text-[#5B5B66] block flex items-center gap-1"><DoorOpen className="w-3 h-3 text-sky-400" /> NA FESTA</span>
+                  <div className="font-persona text-3xl text-sky-400 mt-1">{data.checkinCount ?? 0}</div>
+                  <span className="text-[9px] text-[#5B5B66] block mt-1">
+                    {data.revenue.mismatchCount > 0 ? `${data.revenue.mismatchCount} pagamento(s) com valor divergente` : 'check-ins na portaria'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-data text-xs">
+                <div>
+                  <span className="text-[9px] uppercase tracking-widest text-[#5B5B66] block mb-2">Por lote</span>
+                  {data.revenue.byLot.length === 0 ? (
+                    <p className="text-[#5B5B66]">Nenhuma venda ainda.</p>
+                  ) : (
+                    <ul className="divide-y divide-[#1F1F24]">
+                      {data.revenue.byLot.map((row) => (
+                        <li key={row.lot} className="py-1.5 flex justify-between">
+                          <span className="text-[#E8E8EF] uppercase">{row.lot} <span className="text-[#5B5B66]">· {row.count} ingr.</span></span>
+                          <span className="text-[#F5C400]">{formatBRL(row.cents)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[9px] uppercase tracking-widest text-[#5B5B66] block mb-2">Por dia</span>
+                  {data.revenue.byDay.length === 0 ? (
+                    <p className="text-[#5B5B66]">Nenhuma venda ainda.</p>
+                  ) : (
+                    <ul className="divide-y divide-[#1F1F24] max-h-48 overflow-y-auto">
+                      {data.revenue.byDay.map((row) => (
+                        <li key={row.day} className="py-1.5 flex justify-between">
+                          <span className="text-[#E8E8EF]">{row.day} <span className="text-[#5B5B66]">· {row.count} ingr.</span></span>
+                          <span className="text-[#F5C400]">{formatBRL(row.cents)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* FUNIL DE CONVERSÃO */}
           <div className="bg-[#141418] border border-[#1F1F24] p-6">

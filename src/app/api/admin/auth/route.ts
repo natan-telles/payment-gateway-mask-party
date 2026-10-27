@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveRole } from '@/lib/admin-auth';
 
+// Valida a senha e informa o papel: 'admin' (tudo) ou 'checkin' (só portaria)
 export async function POST(req: NextRequest) {
   try {
     const { password } = await req.json();
-    const expectedPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const role = resolveRole(typeof password === 'string' ? password : null);
 
-    if (!password || password !== expectedPassword) {
+    if (!role) {
       return NextResponse.json(
-        { success: false, error: 'Senha de administrador incorreta.' },
+        { success: false, error: 'Senha incorreta.' },
         { status: 401 }
       );
     }
 
-    return NextResponse.json({ success: true, message: 'Autenticado com sucesso.' });
-  } catch (err: any) {
-    return NextResponse.json(
-      { success: false, error: err.message || 'Erro na autenticação' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, role, message: 'Autenticado com sucesso.' });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Erro na autenticação';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAppUrl } from '@/lib/app-url';
 import { sendTicketEmail } from '@/lib/notifications/email';
 import { logNotification } from '@/lib/notifications/log';
+import { buildTicketPdfAttachment } from '@/lib/tickets/pdf';
 import { getOrderLotLabels } from '@/lib/lots/server';
 import { getPaymentProvider } from '.';
 import { PaymentProvider, PaymentReference } from './types';
@@ -158,6 +159,12 @@ async function getSettledOrder(orderId: string): Promise<ConfirmResult | null> {
 export async function notifyTicketIssued(result: ConfirmResult) {
   if (result.status !== 'confirmed' || !result.issued || !result.ticketCode) return;
 
+  // PDF do ingresso vai em anexo (além do QR inline); se a geração falhar, o e-mail segue sem ele
+  const pdf = await buildTicketPdfAttachment(
+    { name: result.issued.name, email: result.issued.email, ticketCode: result.ticketCode, kind: 'paid', lotName: result.issued.lotName },
+    result.issued.leadId
+  );
+
   const emailRes = await sendTicketEmail({
     to: result.issued.email,
     name: result.issued.name,
@@ -165,6 +172,8 @@ export async function notifyTicketIssued(result: ConfirmResult) {
     lotName: result.issued.lotName,
     receiptUrl: result.issued.receiptUrl,
     leadId: result.issued.leadId,
+    kind: 'paid',
+    pdf,
   });
 
   if (!emailRes.success) {

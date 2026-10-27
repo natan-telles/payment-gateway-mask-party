@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, RefreshCw, Plus, Pencil, Trash2, Power, Ticket, X } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Plus, Pencil, Trash2, Power, Ticket, X, Timer, Wallet } from 'lucide-react';
 import { PersonaMaskIcon } from '@/components/PersonaMaskIcon';
 import { AdminNavTabs } from '@/components/AdminNavTabs';
 import { formatPrice } from '@/lib/payments/format';
@@ -18,8 +18,18 @@ interface AdminLot {
   is_active: boolean;
   sold: number;
   reserved: number;
+  revenue_cents?: number;
   available: number;
   is_current: boolean;
+}
+
+interface ActiveReservation {
+  lot_id: string;
+  name: string;
+  phone: string;
+  amount_cents: number;
+  reserved_until: string;
+  minutes_left: number;
 }
 
 interface LotForm {
@@ -95,6 +105,7 @@ function getLotStatus(lot: AdminLot) {
 
 export default function LotsPage() {
   const [lots, setLots] = useState<AdminLot[]>([]);
+  const [reservations, setReservations] = useState<ActiveReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +131,7 @@ export default function LotsPage() {
     try {
       const json = await request('GET');
       setLots(json.data);
+      setReservations(Array.isArray(json.activeReservations) ? json.activeReservations : []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro de conexão ao carregar lotes.');
@@ -135,7 +147,9 @@ export default function LotsPage() {
 
     request('GET')
       .then((json) => {
-        if (!cancelled) setLots(json.data);
+        if (cancelled) return;
+        setLots(json.data);
+        setReservations(Array.isArray(json.activeReservations) ? json.activeReservations : []);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Erro de conexão ao carregar lotes.');
@@ -417,6 +431,37 @@ export default function LotsPage() {
           </form>
         )}
 
+        {/* RESERVAS ATIVAS: quem está na tela do Pix neste minuto */}
+        <section className="bg-[#141418] border border-amber-400/30 p-4 mb-6 font-data">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs uppercase tracking-widest text-amber-300 flex items-center gap-2">
+              <Timer className="w-4 h-4" /> Reservas ativas agora ({reservations.length})
+            </h2>
+            <span className="text-[9px] text-[#5B5B66] uppercase">Cada reserva segura a vaga por 30 min</span>
+          </div>
+          {reservations.length === 0 ? (
+            <p className="text-[11px] text-[#5B5B66]">Ninguém com Pix em aberto neste momento.</p>
+          ) : (
+            <ul className="divide-y divide-[#1F1F24]">
+              {reservations.map((r) => {
+                const lot = lots.find((l) => l.id === r.lot_id);
+                return (
+                  <li key={`${r.lot_id}-${r.phone}-${r.reserved_until}`} className="py-2 flex items-center justify-between gap-3 text-xs">
+                    <div className="min-w-0">
+                      <span className="block uppercase text-[#E8E8EF] truncate">{r.name}</span>
+                      <span className="text-[10px] text-[#5B5B66]">{lot ? lot.name : 'Lote'} · {formatPrice(r.amount_cents)}</span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className={`font-persona text-xl ${r.minutes_left <= 5 ? 'text-[#FF2E3B]' : 'text-amber-300'}`}>{r.minutes_left} min</span>
+                      <span className="block text-[9px] text-[#5B5B66]">até {formatDateTime(r.reserved_until)}</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
         {loading && !lots.length ? (
           <div className="py-20 text-center text-[#5B5B66] font-data uppercase text-xs">Carregando lotes...</div>
         ) : !lots.length ? (
@@ -470,8 +515,11 @@ export default function LotsPage() {
                     <div className="h-full bg-emerald-400" style={{ width: `${soldPct}%` }} />
                     <div className="h-full bg-amber-400" style={{ width: `${reservedPct}%` }} />
                   </div>
-                  <span className="text-[10px] text-[#5B5B66] block mb-4">
+                  <span className="text-[10px] text-[#5B5B66] block mb-1">
                     {occupied} de {lot.capacity} ocupados
+                  </span>
+                  <span className="text-[10px] text-[#F5C400] flex items-center gap-1 mb-4">
+                    <Wallet className="w-3 h-3" /> Arrecadado neste lote: <strong>{formatPrice(lot.revenue_cents ?? 0)}</strong>
                   </span>
 
                   <div className="space-y-1 text-[10px] text-[#5B5B66] mb-4">

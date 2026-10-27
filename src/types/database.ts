@@ -1,6 +1,7 @@
 export type QueueStatus = 'waiting' | 'notified' | 'expired' | 'purchased' | 'cancelled';
 export type PaymentStatus = 'pending' | 'approved' | 'expired' | 'refunded' | 'failed';
 export type TicketStatus = 'none' | 'issued' | 'checked_in' | 'cancelled';
+export type TicketKind = 'paid' | 'courtesy';
 
 export interface WaitingQueueEntry {
   id: string;
@@ -24,6 +25,8 @@ export interface WaitingQueueEntry {
   checkin_at: string | null;
   notes: string | null;
   payment_deadline: string | null;
+  ticket_kind?: TicketKind;
+  courtesy_note?: string | null;
 }
 
 export type PaymentOrderStatus = 'reserved' | 'paid' | 'expired' | 'cancelled' | 'duplicate';

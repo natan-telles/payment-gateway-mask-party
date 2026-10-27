@@ -1,10 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { checkCheckinAuth } from '@/lib/admin-auth';
 
-function checkAdminAuth(req: NextRequest) {
-  const authHeader = req.headers.get('x-admin-password');
-  const expected = process.env.ADMIN_PASSWORD || 'admin123';
-  return authHeader === expected;
+// Contador ao vivo da portaria: quantos já entraram / quantos ingressos válidos existem
+export async function GET(req: NextRequest) {
+  if (!checkCheckinAuth(req)) {
+    return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('waiting_queue')
+    .select('ticket_kind, checkin_status, checkin_at')
+    .eq('payment_status', 'approved')
+    .neq('ticket_status', 'cancelled');
+
+  if (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+
+  const rows = data ?? [];
+  const total = rows.length;
+  const checkedIn = rows.filter((r) => r.checkin_status).length;
+  const courtesyTotal = rows.filter((r) => r.ticket_kind === 'courtesy').length;
+  const courtesyIn = rows.filter((r) => r.ticket_kind === 'courtesy' && r.checkin_status).length;
+  const since = Date.now() - 15 * 60 * 1000;
+  const last15min = rows.filter((r) => r.checkin_status && r.checkin_at && new Date(r.checkin_at).getTime() >= since).length;
+
+  return NextResponse.json({
+    success: true,
+    stats: { total, checkedIn, remaining: total - checkedIn, courtesyTotal, courtesyIn, last15min, at: new Date().toISOString() },
+  });
 }
 
 type CheckinResult = {
@@ -13,6 +39,7 @@ type CheckinResult = {
   error?: string;
   name?: string;
   ticket_code?: string;
+  ticket_kind?: 'paid' | 'courtesy';
   checkin_at?: string;
 };
 
@@ -30,7 +57,7 @@ async function checkInWithoutRpc(ticketCode: string): Promise<CheckinResult> {
     .eq('payment_status', 'approved')
     .eq('ticket_status', 'issued')
     .eq('checkin_status', false)
-    .select('name, ticket_code, checkin_at')
+    .select('name, ticket_code, checkin_at, ticket_kind')
     .maybeSingle();
 
   if (updateError) throw updateError;
@@ -40,7 +67,7 @@ async function checkInWithoutRpc(ticketCode: string): Promise<CheckinResult> {
 
   const { data: ticket, error: lookupError } = await supabase
     .from('waiting_queue')
-    .select('name, ticket_code, payment_status, ticket_status, checkin_status, checkin_at')
+    .select('name, ticket_code, payment_status, ticket_status, checkin_status, checkin_at, ticket_kind')
     .eq('ticket_code', normalizedCode)
     .maybeSingle();
 
@@ -53,6 +80,7 @@ async function checkInWithoutRpc(ticketCode: string): Promise<CheckinResult> {
       error: 'Este ingresso já foi utilizado.',
       name: ticket.name,
       ticket_code: ticket.ticket_code,
+      ticket_kind: ticket.ticket_kind,
       checkin_at: ticket.checkin_at,
     };
   }
@@ -61,7 +89,7 @@ async function checkInWithoutRpc(ticketCode: string): Promise<CheckinResult> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!checkAdminAuth(req)) {
+  if (!checkCheckinAuth(req)) {
     return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 });
   }
 
