@@ -43,7 +43,7 @@ const EXPERIENCE: Array<{
     icon: Music,
     index: '01',
     label: 'O SOM',
-    title: 'DJ SET ATÉ 05H',
+    title: 'DJ SET ATÉ 03H',
     text: 'House, Melodic e Dark Disco a noite inteira. Bar sem álcool com 1 drink incluso no ingresso.',
   },
   {
@@ -67,7 +67,7 @@ const EXPERIENCE: Array<{
   },
 ];
 
-const buildMarquee = (lot: LotLabels) => ['SEM MÁSCARA, SEM ENTRADA', '31.10', 'SJC', lot.code, '1 DRINK INCLUSO', 'DJ SET ATÉ 05H'];
+const buildMarquee = (lot: LotLabels) => ['SEM MÁSCARA, SEM ENTRADA', '31.10', 'SJC', lot.code, '1 DRINK INCLUSO', 'DJ SET ATÉ 03H'];
 
 const buildGuide = (lot: LotLabels): Array<{ id: Tab; title: string; accent: string; content: React.ReactNode }> => [
   {
@@ -311,7 +311,7 @@ export default function Home() {
               <div className="grid grid-cols-3 gap-2 font-data text-[10px] uppercase text-[#E8E8EF] mb-10">
                 {[
                   { label: 'BAR', value: '1 DRINK INCLUSO', color: 'text-[#8A3CFF] font-bold' },
-                  { label: 'SOM', value: 'DJ SET ATÉ 05H', color: '' },
+                  { label: 'SOM', value: 'DJ SET ATÉ 03H', color: '' },
                   { label: 'ACESSO', value: isPaid ? 'PAGO' : lot.name, color: 'text-[#FF2E3B] font-bold' },
                 ].map((pill) => (
                   <div
