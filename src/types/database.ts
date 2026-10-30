@@ -9,7 +9,8 @@ export interface WaitingQueueEntry {
   queue_position: number;
   name: string;
   phone: string;
-  email: string;
+  /** Pode ser nulo só em cortesia emitida sem e-mail */
+  email: string | null;
   age: number | null;
   neighborhood: string | null;
   instagram: string | null;

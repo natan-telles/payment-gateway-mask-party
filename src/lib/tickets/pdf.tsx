@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
 
 export interface TicketPdfInput {
   name: string;
-  email: string;
+  email: string | null;
   ticketCode: string;
   kind: TicketKind;
   /** Rótulo do lote (ingresso pago) */
@@ -105,7 +105,7 @@ function TicketDocument({ name, email, ticketCode, kind, lotName, note, qrDataUr
 
             <Text style={styles.label}>PARTICIPANTE</Text>
             <Text style={styles.name}>{name.toUpperCase()}</Text>
-            <Text style={styles.email}>{email}</Text>
+            <Text style={styles.email}>{email ?? 'Entrega via WhatsApp'}</Text>
 
             <View style={styles.qrBox}>
               {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image não aceita alt */}
