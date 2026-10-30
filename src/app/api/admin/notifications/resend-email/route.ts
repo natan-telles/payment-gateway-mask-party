@@ -105,8 +105,9 @@ export async function POST(req: NextRequest) {
             { status: 409 }
           );
         }
-        const kind: 'paid' | 'courtesy' = record.ticket_kind === 'courtesy' ? 'courtesy' : 'paid';
-        const ticketLot = kind === 'paid' ? await getPaidLotName(record.id) : 'CORTESIA';
+        const kind: 'paid' | 'courtesy' | 'volunteer' =
+          record.ticket_kind === 'courtesy' ? 'courtesy' : record.ticket_kind === 'volunteer' ? 'volunteer' : 'paid';
+        const ticketLot = kind === 'paid' ? await getPaidLotName(record.id) : kind === 'volunteer' ? 'VOLUNTÁRIO' : 'CORTESIA';
         const pdf = await buildTicketPdfAttachment(
           { name: record.name, email: targetEmail, ticketCode: record.ticket_code, kind, lotName: ticketLot, note: record.courtesy_note },
           record.id

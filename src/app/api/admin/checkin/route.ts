@@ -24,12 +24,14 @@ export async function GET(req: NextRequest) {
   const checkedIn = rows.filter((r) => r.checkin_status).length;
   const courtesyTotal = rows.filter((r) => r.ticket_kind === 'courtesy').length;
   const courtesyIn = rows.filter((r) => r.ticket_kind === 'courtesy' && r.checkin_status).length;
+  const volunteerTotal = rows.filter((r) => r.ticket_kind === 'volunteer').length;
+  const volunteerIn = rows.filter((r) => r.ticket_kind === 'volunteer' && r.checkin_status).length;
   const since = Date.now() - 15 * 60 * 1000;
   const last15min = rows.filter((r) => r.checkin_status && r.checkin_at && new Date(r.checkin_at).getTime() >= since).length;
 
   return NextResponse.json({
     success: true,
-    stats: { total, checkedIn, remaining: total - checkedIn, courtesyTotal, courtesyIn, last15min, at: new Date().toISOString() },
+    stats: { total, checkedIn, remaining: total - checkedIn, courtesyTotal, courtesyIn, volunteerTotal, volunteerIn, last15min, at: new Date().toISOString() },
   });
 }
 
@@ -39,7 +41,7 @@ type CheckinResult = {
   error?: string;
   name?: string;
   ticket_code?: string;
-  ticket_kind?: 'paid' | 'courtesy';
+  ticket_kind?: 'paid' | 'courtesy' | 'volunteer';
   checkin_at?: string;
 };
 

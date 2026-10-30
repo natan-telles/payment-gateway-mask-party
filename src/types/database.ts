@@ -1,15 +1,16 @@
 export type QueueStatus = 'waiting' | 'notified' | 'expired' | 'purchased' | 'cancelled';
 export type PaymentStatus = 'pending' | 'approved' | 'expired' | 'refunded' | 'failed';
 export type TicketStatus = 'none' | 'issued' | 'checked_in' | 'cancelled';
-export type TicketKind = 'paid' | 'courtesy';
+export type TicketKind = 'paid' | 'courtesy' | 'volunteer';
 
 export interface WaitingQueueEntry {
   id: string;
   created_at: string;
   queue_position: number;
   name: string;
-  phone: string;
-  /** Pode ser nulo só em cortesia emitida sem e-mail */
+  /** Pode ser nulo só em ingresso de voluntário */
+  phone: string | null;
+  /** Pode ser nulo só em cortesia/voluntário emitido sem e-mail */
   email: string | null;
   age: number | null;
   neighborhood: string | null;
