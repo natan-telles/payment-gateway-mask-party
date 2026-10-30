@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, ArrowRight, Loader2 } from 'lucide-react';
+import { MIN_AGE, MAX_AGE } from '@/lib/event';
 import { PersonaMaskIcon } from './PersonaMaskIcon';
 import { DEFAULT_LOT } from '@/lib/lots/labels';
 import { QueueResponse } from '@/types/database';
@@ -187,8 +188,8 @@ export function JoinQueueModal({ isOpen, lotName = DEFAULT_LOT.name, onClose, on
               </label>
               <input
                 type="number"
-                min="16"
-                max="99"
+                min={MIN_AGE}
+                max={MAX_AGE}
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
                 placeholder="Ex: 21"
