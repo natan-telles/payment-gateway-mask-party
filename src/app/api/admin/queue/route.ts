@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       const term = search.replace(/[,()]/g, ' ');
-      query = query.or(`name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%,ticket_code.ilike.%${term}%`);
+      query = query.or(`name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%,ticket_code.ilike.%${term}%,courtesy_note.ilike.%${term}%`);
     }
 
     if (notificationStatus && notificationStatus !== 'all') {
@@ -92,6 +92,8 @@ export async function GET(req: NextRequest) {
       query = query.eq('payment_status', 'pending').gte('payment_deadline', nowIso).lte('payment_deadline', in2h);
     } else if (paymentStatus === 'courtesy') {
       query = query.eq('ticket_kind', 'courtesy');
+    } else if (paymentStatus === 'volunteer') {
+      query = query.eq('ticket_kind', 'volunteer');
     } else if (paymentStatus && paymentStatus !== 'all') {
       query = query.eq('payment_status', paymentStatus);
     }
@@ -160,8 +162,9 @@ export async function GET(req: NextRequest) {
     // Métricas resumidas (sobre o conjunto filtrado)
     const total = leads.length;
     const notifiedCount = leads.filter((l) => l.notification_status === 'sent').length;
-    const paidCount = leads.filter((l) => l.payment_status === 'approved' && l.ticket_kind !== 'courtesy').length;
+    const paidCount = leads.filter((l) => l.payment_status === 'approved' && l.ticket_kind !== 'courtesy' && l.ticket_kind !== 'volunteer').length;
     const courtesyCount = leads.filter((l) => l.ticket_kind === 'courtesy').length;
+    const volunteerCount = leads.filter((l) => l.ticket_kind === 'volunteer').length;
     const isExpired = (l: { payment_status: string; payment_deadline: string | null }) =>
       l.payment_status === 'expired' ||
       (l.payment_status === 'pending' && Boolean(l.payment_deadline) && new Date(l.payment_deadline as string).getTime() < nowMs);
@@ -190,6 +193,7 @@ export async function GET(req: NextRequest) {
         notifiedCount,
         paidCount,
         courtesyCount,
+        volunteerCount,
         expiredCount,
         pendingPaymentCount,
         checkinCount,

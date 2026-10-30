@@ -69,7 +69,10 @@ export async function GET(req: NextRequest) {
 
     // Cortesias ficam fora do funil de conversão (não são inscritos que pagaram)
     const courtesyCount = (leads || []).filter((l) => l.ticket_kind === 'courtesy').length;
-    const allLeads = (leads || []).filter((l) => l.ticket_kind !== 'courtesy');
+    const volunteerCount = (leads || []).filter((l) => l.ticket_kind === 'volunteer').length;
+    // Check-ins de TODOS os ingressos (pagos + cortesias + voluntários)
+    const checkinAll = (leads || []).filter((l) => l.checkin_status === true).length;
+    const allLeads = (leads || []).filter((l) => l.ticket_kind !== 'courtesy' && l.ticket_kind !== 'volunteer');
     const totalLeads = allLeads.length;
 
     // 1. REGISTRATIONS BY DAY (Inscrições por Dia)
@@ -235,6 +238,7 @@ export async function GET(req: NextRequest) {
           notifiedCount,
           paidCount,
           courtesyCount,
+          volunteerCount,
           averageAge,
         },
         byDay,
@@ -243,7 +247,7 @@ export async function GET(req: NextRequest) {
         funnel,
         campaignAttribution,
         revenue,
-        checkinCount,
+        checkinCount: checkinAll,
       },
     });
   } catch (err: any) {

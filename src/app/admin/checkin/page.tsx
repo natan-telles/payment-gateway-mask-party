@@ -34,6 +34,8 @@ type CheckinStats = {
   remaining: number;
   courtesyTotal: number;
   courtesyIn: number;
+  volunteerTotal?: number;
+  volunteerIn?: number;
   last15min: number;
   at: string;
 };
@@ -44,7 +46,7 @@ type CheckinResult = {
   error?: string;
   name?: string;
   ticket_code?: string;
-  ticket_kind?: 'paid' | 'courtesy';
+  ticket_kind?: 'paid' | 'courtesy' | 'volunteer';
   checkin_at?: string;
 };
 
@@ -271,8 +273,12 @@ export default function CheckinPage() {
           <div className="font-persona text-3xl text-[#E8E8EF] mt-1">{stats ? stats.last15min : '—'}</div>
         </div>
         <div className="bg-[#141418] border border-[#1F1F24] p-4">
-          <span className="text-[9px] uppercase tracking-widest text-[#5B5B66]">Cortesias</span>
-          <div className="font-persona text-3xl text-[#F5C400] mt-1">{stats ? `${stats.courtesyIn}/${stats.courtesyTotal}` : '—'}</div>
+          <span className="text-[9px] uppercase tracking-widest text-[#5B5B66]">Cortesias · Equipe</span>
+          <div className="font-persona text-2xl mt-1">
+            <span className="text-[#F5C400]">{stats ? `${stats.courtesyIn}/${stats.courtesyTotal}` : '—'}</span>
+            <span className="text-[#5B5B66] text-base"> · </span>
+            <span className="text-[#2DD4BF]">{stats ? `${stats.volunteerIn ?? 0}/${stats.volunteerTotal ?? 0}` : '—'}</span>
+          </div>
         </div>
       </section>
 
@@ -311,6 +317,9 @@ export default function CheckinPage() {
             {result.name && <p className="font-data text-base text-[#E8E8EF] mt-2">{result.name}</p>}
             {result.ticket_kind === 'courtesy' && (
               <span className="inline-block mt-2 bg-[#F5C400] text-[#0B0B0D] px-2 py-0.5 font-data text-[10px] font-bold tracking-widest">INGRESSO CORTESIA</span>
+            )}
+            {result.ticket_kind === 'volunteer' && (
+              <span className="inline-block mt-2 bg-[#2DD4BF] text-[#0B0B0D] px-2 py-0.5 font-data text-[10px] font-bold tracking-widest">VOLUNTÁRIO · EQUIPE</span>
             )}
             {result.ticket_code && <p className="font-data text-xs text-[#5B5B66] mt-1">{result.ticket_code}</p>}
             <p className="font-data text-xs text-[#B8B8C1] mt-3">{accepted ? 'Check-in registrado com sucesso.' : result.error || 'Não foi possível validar este ingresso.'}</p>

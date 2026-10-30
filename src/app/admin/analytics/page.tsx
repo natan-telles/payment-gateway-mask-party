@@ -22,6 +22,7 @@ interface AnalyticsData {
     notifiedCount: number;
     paidCount: number;
     courtesyCount?: number;
+    volunteerCount?: number;
     averageAge: number;
   };
   byDay: Array<{
@@ -207,7 +208,7 @@ export default function AnalyticsPage() {
                 {data.funnel.notifiedConversionRate}%
               </div>
               <span className="text-[9px] text-[#5B5B66] block mt-1">
-                Notificados &rarr; Pagos{data.summary.courtesyCount ? ` · ${data.summary.courtesyCount} cortesia(s) fora do funil` : ''}
+                Notificados &rarr; Pagos{(data.summary.courtesyCount || data.summary.volunteerCount) ? ' · cortesias e voluntários fora do funil' : ''}
               </span>
             </div>
 
@@ -237,7 +238,9 @@ export default function AnalyticsPage() {
                 <div className="bg-[#0B0B0D] border border-[#1F1F24] p-4">
                   <span className="text-[10px] uppercase text-[#5B5B66] block">INGRESSOS VENDIDOS</span>
                   <div className="font-persona text-3xl text-emerald-400 mt-1">{data.revenue.ticketsSold}</div>
-                  <span className="text-[9px] text-[#5B5B66] block mt-1">{data.summary.courtesyCount ? `+ ${data.summary.courtesyCount} cortesia(s)` : 'pagos no gateway'}</span>
+                  <span className="text-[9px] text-[#5B5B66] block mt-1">
+                    {[data.summary.courtesyCount ? `+${data.summary.courtesyCount} cortesia(s)` : null, data.summary.volunteerCount ? `+${data.summary.volunteerCount} voluntário(s)` : null].filter(Boolean).join(' · ') || 'pagos no gateway'}
+                  </span>
                 </div>
                 <div className="bg-[#0B0B0D] border border-[#1F1F24] p-4">
                   <span className="text-[10px] uppercase text-[#5B5B66] block">TICKET MÉDIO</span>
