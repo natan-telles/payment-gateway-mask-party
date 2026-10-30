@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from '@react-pdf/renderer';
 import QRCode from 'qrcode';
 import type { TicketKind } from '@/types/database';
+import { TICKET_KINDS } from './kinds';
 import { logNotification } from '@/lib/notifications/log';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { DEFAULT_LOT, lotLabels } from '@/lib/lots/labels';
@@ -29,6 +30,7 @@ const COLORS = {
   dim: '#5B5B66',
   purple: '#8A3CFF',
   yellow: '#F5C400',
+  teal: '#2DD4BF',
   red: '#FF2E3B',
   white: '#FFFFFF',
 };
@@ -45,6 +47,7 @@ const styles = StyleSheet.create({
   badge: { paddingVertical: 4, paddingHorizontal: 8, fontSize: 8, fontFamily: 'Helvetica-Bold', letterSpacing: 1.5 },
   badgePaid: { backgroundColor: COLORS.purple, color: COLORS.bg },
   badgeCourtesy: { backgroundColor: COLORS.yellow, color: COLORS.bg },
+  badgeVolunteer: { backgroundColor: COLORS.teal, color: COLORS.bg },
   lot: { fontSize: 8, color: COLORS.muted, letterSpacing: 1 },
   label: { fontSize: 7, color: COLORS.dim, letterSpacing: 2, marginBottom: 3 },
   name: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: COLORS.text, marginBottom: 2 },
@@ -85,27 +88,28 @@ export interface TicketPdfInput {
 
 function TicketDocument({ name, email, ticketCode, kind, lotName, note, qrDataUrl }: TicketPdfInput & { qrDataUrl: string }) {
   const isCourtesy = kind === 'courtesy';
+  const isVolunteer = kind === 'volunteer';
+  const isStaff = isCourtesy || isVolunteer;
+  const badgeStyle = isVolunteer ? styles.badgeVolunteer : isCourtesy ? styles.badgeCourtesy : styles.badgePaid;
   return (
-    <Document title={`Ingresso ${ticketCode} · Baile da Lagoa`} author="Baile da Lagoa" subject={isCourtesy ? 'Ingresso cortesia' : 'Ingresso'}>
+    <Document title={`Ingresso ${ticketCode} · Baile da Lagoa`} author="Baile da Lagoa" subject={TICKET_KINDS[kind].label}>
       <Page size={[420, 760]} style={styles.page}>
         <View style={styles.card}>
           <View style={styles.header}>
             <Text style={styles.headerKicker}>{EVENT_INFO.subtitle} · 31.10 · SJC</Text>
             <Text style={styles.headerTitle}>{EVENT_INFO.title}</Text>
-            <Text style={styles.headerSub}>{isCourtesy ? 'INGRESSO CORTESIA' : 'INGRESSO CONFIRMADO'}</Text>
+            <Text style={styles.headerSub}>{isVolunteer ? 'ACESSO DE VOLUNTÁRIO' : isCourtesy ? 'INGRESSO CORTESIA' : 'INGRESSO CONFIRMADO'}</Text>
           </View>
 
           <View style={styles.body}>
             <View style={styles.kindRow}>
-              <Text style={[styles.badge, isCourtesy ? styles.badgeCourtesy : styles.badgePaid]}>
-                {isCourtesy ? 'CORTESIA' : 'PAGO'}
-              </Text>
-              <Text style={styles.lot}>{isCourtesy ? 'ACESSO LIBERADO' : (lotName ?? '').toUpperCase()}</Text>
+              <Text style={[styles.badge, badgeStyle]}>{TICKET_KINDS[kind].short}</Text>
+              <Text style={styles.lot}>{isVolunteer ? 'EQUIPE DO EVENTO' : isCourtesy ? 'ACESSO LIBERADO' : (lotName ?? '').toUpperCase()}</Text>
             </View>
 
             <Text style={styles.label}>PARTICIPANTE</Text>
             <Text style={styles.name}>{name.toUpperCase()}</Text>
-            <Text style={styles.email}>{email ?? 'Entrega via WhatsApp'}</Text>
+            <Text style={styles.email}>{email ?? (isVolunteer ? 'Equipe · entrega via WhatsApp' : 'Entrega via WhatsApp')}</Text>
 
             <View style={styles.qrBox}>
               {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image não aceita alt */}
@@ -134,7 +138,7 @@ function TicketDocument({ name, email, ticketCode, kind, lotName, note, qrDataUr
             <Text style={styles.rule}>{EVENT_INFO.rule}</Text>
             <Text style={styles.note}>Qualquer máscara vale: veneziana, moderna ou avant-garde.</Text>
             <Text style={styles.note}>{EVENT_INFO.drink}</Text>
-            {isCourtesy && note ? <Text style={styles.note}>Cortesia: {note}</Text> : null}
+            {isStaff && note ? <Text style={styles.note}>{isVolunteer ? 'Função' : 'Cortesia'}: {note}</Text> : null}
           </View>
 
           <View style={styles.footer}>

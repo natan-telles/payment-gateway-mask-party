@@ -52,8 +52,12 @@ CREATE INDEX IF NOT EXISTS idx_waiting_queue_payment_status ON public.waiting_qu
 -- Tipo do ingresso: 'paid' (comprado) ou 'courtesy' (cortesia emitida pelo admin).
 -- Declarado aqui para a função de check-in abaixo poder devolvê-lo.
 ALTER TABLE public.waiting_queue ADD COLUMN IF NOT EXISTS ticket_kind TEXT DEFAULT 'paid' NOT NULL
-    CHECK (ticket_kind IN ('paid', 'courtesy'));
+    CHECK (ticket_kind IN ('paid', 'courtesy', 'volunteer'));
 ALTER TABLE public.waiting_queue ADD COLUMN IF NOT EXISTS courtesy_note TEXT;
+-- Bancos que criaram a coluna antes do tipo 'volunteer': troca a CHECK
+ALTER TABLE public.waiting_queue DROP CONSTRAINT IF EXISTS waiting_queue_ticket_kind_check;
+ALTER TABLE public.waiting_queue ADD CONSTRAINT waiting_queue_ticket_kind_check
+    CHECK (ticket_kind IN ('paid', 'courtesy', 'volunteer'));
 
 -- Check-in atômico: a linha do ingresso fica bloqueada enquanto é validada.
 -- Isso impede que duas portarias aprovem o mesmo QR Code ao mesmo tempo.
@@ -152,7 +156,10 @@ BEGIN
     v_clean_phone := regexp_replace(p_phone, '[^\d]', '', 'g');
     v_clean_email := lower(trim(p_email));
 
-    -- Fila de compra exige e-mail (só a cortesia pode ficar sem)
+    -- Fila de compra exige telefone e e-mail (só cortesia/voluntário podem ficar sem)
+    IF v_clean_phone IS NULL OR v_clean_phone = '' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'phone_required');
+    END IF;
     IF v_clean_email IS NULL OR v_clean_email = '' THEN
         RETURN jsonb_build_object('success', false, 'error', 'email_required');
     END IF;
@@ -521,21 +528,32 @@ ALTER TABLE public.notification_logs ENABLE ROW LEVEL SECURITY;
 -- BDL-C-XXXXXX. Não cria payment_orders, então NÃO ocupa vaga de lote.
 -- A portaria valida igual a um ingresso pago.
 --
--- E-mail é OPCIONAL na cortesia (o admin baixa o PDF e envia pelo WhatsApp).
--- Para isso o e-mail deixa de ser NOT NULL e a unicidade passa a valer só
--- quando há e-mail (índice parcial). A fila de compra continua exigindo e-mail
+-- Dois tipos emitidos pelo admin:
+--   'courtesy'  → convidado. Nome + WhatsApp obrigatórios, e-mail opcional. Código BDL-C-.
+--   'volunteer' → equipe. Só o nome é obrigatório (telefone/e-mail opcionais). Código BDL-V-.
+--               Conta como ingresso nas métricas, mas não na receita.
+-- E-mail e telefone deixam de ser NOT NULL; a unicidade vale só quando o valor
+-- existe (índices parciais). A fila de compra continua exigindo os dois
 -- (register_queue_lead valida), então nada muda para quem compra.
 -- ============================================================
 ALTER TABLE public.waiting_queue ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE public.waiting_queue DROP CONSTRAINT IF EXISTS uq_waiting_queue_email;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_waiting_queue_email_not_null
     ON public.waiting_queue (email) WHERE email IS NOT NULL;
+ALTER TABLE public.waiting_queue ALTER COLUMN phone DROP NOT NULL;
+ALTER TABLE public.waiting_queue DROP CONSTRAINT IF EXISTS uq_waiting_queue_phone;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_waiting_queue_phone_not_null
+    ON public.waiting_queue (phone) WHERE phone IS NOT NULL;
+
+-- A assinatura mudou (ganhou p_kind): remove a versão antiga para não ficar duplicada
+DROP FUNCTION IF EXISTS public.issue_courtesy_ticket(TEXT, TEXT, TEXT, TEXT);
 
 CREATE OR REPLACE FUNCTION public.issue_courtesy_ticket(
     p_name TEXT,
     p_phone TEXT,
     p_email TEXT,
-    p_note TEXT DEFAULT NULL
+    p_note TEXT DEFAULT NULL,
+    p_kind TEXT DEFAULT 'courtesy'
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -545,21 +563,30 @@ AS $$
 DECLARE
     v_lead RECORD;
     v_code TEXT;
-    v_phone TEXT := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
-    -- e-mail opcional: vazio vira NULL
+    v_kind TEXT := CASE WHEN p_kind = 'volunteer' THEN 'volunteer' ELSE 'courtesy' END;
+    v_prefix TEXT := CASE WHEN p_kind = 'volunteer' THEN 'BDL-V-' ELSE 'BDL-C-' END;
+    -- telefone e e-mail opcionais: vazio vira NULL
+    v_phone TEXT := nullif(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), '');
     v_email TEXT := nullif(lower(trim(coalesce(p_email, ''))), '');
 BEGIN
-    IF trim(coalesce(p_name, '')) = '' OR v_phone = '' THEN
+    IF trim(coalesce(p_name, '')) = '' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'missing_fields');
+    END IF;
+    -- Cortesia exige WhatsApp (é o canal de entrega e a chave contra duplicidade)
+    IF v_kind = 'courtesy' AND v_phone IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'missing_fields');
     END IF;
 
-    -- Reaproveita cadastro existente (mesmo telefone ou, se informado, mesmo e-mail)
-    SELECT id, name, email, phone, queue_position, ticket_code, ticket_kind, payment_status
-    INTO v_lead
-    FROM public.waiting_queue
-    WHERE phone = v_phone OR (v_email IS NOT NULL AND email = v_email)
-    LIMIT 1
-    FOR UPDATE;
+    -- Reaproveita cadastro existente (mesmo telefone ou mesmo e-mail, quando informados).
+    -- Voluntário só com nome não tem chave: cria sempre um registro novo.
+    IF v_phone IS NOT NULL OR v_email IS NOT NULL THEN
+        SELECT id, name, email, phone, queue_position, ticket_code, ticket_kind, payment_status
+        INTO v_lead
+        FROM public.waiting_queue
+        WHERE (v_phone IS NOT NULL AND phone = v_phone) OR (v_email IS NOT NULL AND email = v_email)
+        LIMIT 1
+        FOR UPDATE;
+    END IF;
 
     IF FOUND THEN
         IF v_lead.payment_status = 'approved' AND v_lead.ticket_code IS NOT NULL THEN
@@ -577,14 +604,14 @@ BEGIN
             );
         END IF;
 
-        v_code := 'BDL-C-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
+        v_code := v_prefix || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
 
         UPDATE public.waiting_queue
         SET payment_status = 'approved',
             payment_date = now(),
             ticket_status = 'issued',
             ticket_code = v_code,
-            ticket_kind = 'courtesy',
+            ticket_kind = v_kind,
             courtesy_note = nullif(trim(coalesce(p_note, '')), ''),
             email = coalesce(email, v_email),
             notification_status = 'sent',
@@ -601,11 +628,11 @@ BEGIN
             'phone', v_lead.phone,
             'queue_position', v_lead.queue_position,
             'ticket_code', v_code,
-            'ticket_kind', 'courtesy'
+            'ticket_kind', v_kind
         );
     END IF;
 
-    v_code := 'BDL-C-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
+    v_code := v_prefix || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
 
     INSERT INTO public.waiting_queue (
         name, phone, email, source,
@@ -614,10 +641,10 @@ BEGIN
         ticket_status, ticket_code, ticket_kind, courtesy_note
     )
     VALUES (
-        trim(p_name), v_phone, v_email, 'courtesy',
+        trim(p_name), v_phone, v_email, v_kind,
         'sent', now(),
         'approved', now(),
-        'issued', v_code, 'courtesy', nullif(trim(coalesce(p_note, '')), '')
+        'issued', v_code, v_kind, nullif(trim(coalesce(p_note, '')), '')
     )
     RETURNING id, name, email, phone, queue_position INTO v_lead;
 
@@ -631,12 +658,12 @@ BEGIN
         'phone', v_lead.phone,
         'queue_position', v_lead.queue_position,
         'ticket_code', v_code,
-        'ticket_kind', 'courtesy'
+        'ticket_kind', v_kind
     );
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.issue_courtesy_ticket(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.issue_courtesy_ticket(TEXT, TEXT, TEXT, TEXT) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.issue_courtesy_ticket(TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.issue_courtesy_ticket(TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
 
 CREATE INDEX IF NOT EXISTS idx_waiting_queue_ticket_kind ON public.waiting_queue (ticket_kind);

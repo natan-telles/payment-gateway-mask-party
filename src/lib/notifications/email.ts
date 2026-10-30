@@ -606,8 +606,8 @@ interface TicketEmailPayload {
   lotName: string;
   receiptUrl?: string | null;
   leadId?: string | null;
-  /** 'courtesy' muda os textos do e-mail (sem pagamento, sem lote) */
-  kind?: 'paid' | 'courtesy';
+  /** 'courtesy'/'volunteer' mudam os textos do e-mail (sem pagamento, sem lote) */
+  kind?: 'paid' | 'courtesy' | 'volunteer';
   /** PDF do ingresso para ir em anexo */
   pdf?: { filename: string; content: Buffer } | null;
 }
@@ -615,6 +615,7 @@ interface TicketEmailPayload {
 // Template HTML de Ingresso Confirmado Baile da Lagoa
 function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl, hasQr, kind = 'paid', pdf }: Omit<TicketEmailPayload, 'to'> & { hasQr: boolean }) {
   const isCourtesy = kind === 'courtesy';
+  const isVolunteer = kind === 'volunteer';
   return `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -634,7 +635,7 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl, hasQr, kind
                 A Noite das Máscaras · 31.10 · SJC
               </div>
               <div style="font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: -1px; margin-top: 3px;">
-                ${isCourtesy ? 'Ingresso Cortesia' : 'Ingresso Confirmado'}
+                ${isVolunteer ? 'Acesso de Voluntário' : isCourtesy ? 'Ingresso Cortesia' : 'Ingresso Confirmado'}
               </div>
             </td>
           </tr>
@@ -645,7 +646,9 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl, hasQr, kind
               </p>
               <p style="font-size: 12px; color: #8C8C9A; font-family: monospace; line-height: 1.6; margin: 0 0 16px 0;">
                 ${
-                  isCourtesy
+                  isVolunteer
+                    ? 'Este é o seu <strong style="color: #E8E8EF;">acesso de voluntário</strong> ao Baile da Lagoa. Apresente o QR Code abaixo na portaria. Vale também mostrar só o código.'
+                    : isCourtesy
                     ? 'Você ganhou um <strong style="color: #E8E8EF;">ingresso cortesia</strong> para o Baile da Lagoa. Apresente o QR Code abaixo na portaria. Vale também mostrar só o código.'
                     : 'Seu pagamento foi confirmado com sucesso. Apresente o QR Code abaixo na portaria do <strong style="color: #E8E8EF;">Baile da Lagoa</strong>. Vale também mostrar só o código.'
                 }
@@ -680,7 +683,7 @@ function getTicketEmailHtml({ name, ticketCode, lotName, receiptUrl, hasQr, kind
                 <tr>
                   <td style="padding: 12px 14px;">
                     <span style="font-size: 9px; font-family: monospace; text-transform: uppercase; color: #8C8C9A; letter-spacing: 2px; display: block;">
-                      Código do Ingresso · ${isCourtesy ? 'CORTESIA' : lotName}
+                      Código do Ingresso · ${isVolunteer ? 'VOLUNTÁRIO' : isCourtesy ? 'CORTESIA' : lotName}
                     </span>
                     <div style="font-size: 28px; font-weight: 900; color: #8A3CFF; line-height: 1.1; margin: 6px 0; font-family: monospace;">
                       ${ticketCode}
@@ -762,7 +765,9 @@ async function buildTicketQrAttachment(ticketCode: string): Promise<EmailAttachm
 }
 
 export async function sendTicketEmail({ to, name, ticketCode, lotName, receiptUrl, leadId, kind = 'paid', pdf }: TicketEmailPayload): Promise<SendResult> {
-  const subject = kind === 'courtesy'
+  const subject = kind === 'volunteer'
+    ? `🎭 Seu acesso de voluntário · Baile da Lagoa (${ticketCode})`
+    : kind === 'courtesy'
     ? `🎭 Seu ingresso cortesia · Baile da Lagoa (${ticketCode})`
     : `🎭 Ingresso confirmado · Baile da Lagoa (${ticketCode})`;
   const qr = await buildTicketQrAttachment(ticketCode);
@@ -780,7 +785,7 @@ export async function sendTicketEmail({ to, name, ticketCode, lotName, receiptUr
     leadId,
     meta: { ticketCode, lotName, kind, qrAttached: qr !== null, pdfAttached: Boolean(pdf) },
     simulatorLines: [
-      `Ingresso: ${ticketCode} · ${kind === 'courtesy' ? 'CORTESIA' : lotName}`,
+      `Ingresso: ${ticketCode} · ${kind === 'volunteer' ? 'VOLUNTÁRIO' : kind === 'courtesy' ? 'CORTESIA' : lotName}`,
       `QR Code: ${qr ? 'anexado (' + TICKET_QR_FILENAME + ')' : 'não gerado'}`,
       `PDF: ${pdf ? 'anexado (' + pdf.filename + ')' : 'não'}`,
     ],

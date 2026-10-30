@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Este cadastro não tem ingresso válido.' }, { status: 409 });
   }
 
-  const kind = (lead.ticket_kind as 'paid' | 'courtesy' | null) ?? 'paid';
+  const kind = (lead.ticket_kind as 'paid' | 'courtesy' | 'volunteer' | null) ?? 'paid';
   const lotName = kind === 'paid' ? await getPaidLotName(lead.id) : null;
 
   try {

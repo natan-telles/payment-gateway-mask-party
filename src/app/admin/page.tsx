@@ -107,6 +107,7 @@ export default function AdminPage() {
     notifiedCount: 0,
     paidCount: 0,
     courtesyCount: 0,
+    volunteerCount: 0,
     expiredCount: 0,
     pendingPaymentCount: 0,
     checkinCount: 0,
@@ -158,7 +159,7 @@ export default function AdminPage() {
 
   // Ingresso cortesia (só o admin emite)
   const [isCourtesyModalOpen, setIsCourtesyModalOpen] = useState(false);
-  const [courtesyForm, setCourtesyForm] = useState({ name: '', phone: '', email: '', note: '', sendEmail: true });
+  const [courtesyForm, setCourtesyForm] = useState({ kind: 'courtesy' as 'courtesy' | 'volunteer', name: '', phone: '', email: '', note: '', sendEmail: true });
   const [isIssuingCourtesy, setIsIssuingCourtesy] = useState(false);
   const [courtesyResult, setCourtesyResult] = useState<{
     type: 'success' | 'error';
@@ -167,6 +168,8 @@ export default function AdminPage() {
     leadId?: string;
     name?: string;
     phone?: string;
+    kind?: 'courtesy' | 'volunteer';
+    hasEmail?: boolean;
   } | null>(null);
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null);
 
@@ -416,7 +419,7 @@ export default function AdminPage() {
     const rows = leads.map((l) => [
       l.queue_position,
       `"${l.name}"`,
-      `"${l.phone}"`,
+      `"${l.phone ?? ''}"`,
       `"${l.email ?? ''}"`,
       l.age || '',
       `"${l.neighborhood || ''}"`,
@@ -425,7 +428,7 @@ export default function AdminPage() {
       l.notification_status,
       l.payment_status,
       l.ticket_code || '',
-      l.ticket_kind === 'courtesy' ? 'cortesia' : l.payment_status === 'approved' ? 'pago' : '',
+      l.ticket_kind === 'courtesy' ? 'cortesia' : l.ticket_kind === 'volunteer' ? 'voluntario' : l.payment_status === 'approved' ? 'pago' : '',
       l.paid_order?.lot_name || '',
       l.paid_order ? ((l.paid_order.paid_amount_cents ?? l.paid_order.amount_cents) / 100).toFixed(2).replace('.', ',') : '',
       l.paid_order?.paid_at ? new Date(l.paid_order.paid_at).toLocaleString('pt-BR') : l.payment_date ? new Date(l.payment_date).toLocaleString('pt-BR') : '',
@@ -448,6 +451,10 @@ export default function AdminPage() {
   };
 
   const handleNotifyWhatsApp = (lead: WaitingQueueEntry) => {
+    if (!lead.phone) {
+      alert('Este cadastro não tem WhatsApp.');
+      return;
+    }
     const rawPhone = lead.phone.replace(/\D/g, '');
     const phoneWithDDI = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
 
@@ -561,16 +568,25 @@ export default function AdminPage() {
   };
 
   const openCourtesyModal = () => {
-    setCourtesyForm({ name: '', phone: '', email: '', note: '', sendEmail: true });
+    setCourtesyForm((f) => ({ kind: f.kind, name: '', phone: '', email: '', note: '', sendEmail: true }));
     setCourtesyResult(null);
     setIsCourtesyModalOpen(true);
   };
 
   const handleIssueCourtesy = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { name, phone, email, note, sendEmail } = courtesyForm;
-    if (!name.trim() || phone.replace(/\D/g, '').length < 10) {
-      setCourtesyResult({ type: 'error', message: 'Preencha nome e WhatsApp com DDD.' });
+    const { kind, name, phone, email, note, sendEmail } = courtesyForm;
+    const digits = phone.replace(/\D/g, '');
+    if (!name.trim()) {
+      setCourtesyResult({ type: 'error', message: 'Preencha o nome.' });
+      return;
+    }
+    if (kind === 'courtesy' && digits.length < 10) {
+      setCourtesyResult({ type: 'error', message: 'Para cortesia, preencha o WhatsApp com DDD.' });
+      return;
+    }
+    if (digits && digits.length < 10) {
+      setCourtesyResult({ type: 'error', message: 'WhatsApp inválido (use DDD) — ou deixe em branco.' });
       return;
     }
     if (email.trim() && !email.includes('@')) {
@@ -584,45 +600,52 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/courtesy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ name, phone, email, note, sendEmail }),
+        body: JSON.stringify({ kind, name, phone, email, note, sendEmail }),
       });
       const data = await res.json();
 
       if (res.ok && data.success) {
-        const t = data.ticket as { id: string; name: string; phone: string; ticket_code: string };
+        const t = data.ticket as { id: string; name: string; phone: string | null; ticket_code: string };
+        const kindLabel = kind === 'volunteer' ? 'Acesso de voluntário' : 'Cortesia';
         let message: string;
         if (data.alreadyPaid) message = data.message;
-        else if (data.alreadyIssued) message = `${t.name} já tinha cortesia emitida (${t.ticket_code}). Nenhum código novo foi gerado.`;
-        else message = `Cortesia ${t.ticket_code} emitida para ${t.name}${data.reusedLead ? ' (cadastro já existente na fila)' : ''}.`;
+        else if (data.alreadyIssued) message = `${t.name} já tinha ingresso emitido (${t.ticket_code}). Nenhum código novo foi gerado.`;
+        else message = `${kindLabel} ${t.ticket_code} emitido para ${t.name}${data.reusedLead ? ' (cadastro já existente na fila)' : ''}.`;
         if (!data.alreadyPaid) {
           if (!data.hasEmail) message += ' Sem e-mail: baixe o PDF abaixo e envie pelo WhatsApp.';
           else if (sendEmail) message += data.emailSent ? ' E-mail com QR Code e PDF enviado.' : ` E-mail FALHOU${data.emailError ? `: ${data.emailError}` : ''} — baixe o PDF e envie manualmente.`;
         }
-        setCourtesyResult({ type: 'success', message, ticketCode: t.ticket_code, leadId: t.id, name: t.name, phone: t.phone });
+        setCourtesyResult({ type: 'success', message, ticketCode: t.ticket_code, leadId: t.id, name: t.name, phone: t.phone ?? '', kind, hasEmail: Boolean(data.hasEmail) });
         fetchLeads();
       } else {
         setCourtesyResult({ type: 'error', message: data.error || 'Falha ao emitir cortesia.' });
       }
     } catch {
-      setCourtesyResult({ type: 'error', message: 'Erro de conexão ao emitir cortesia.' });
+      setCourtesyResult({ type: 'error', message: 'Erro de conexão ao emitir ingresso.' });
     } finally {
       setIsIssuingCourtesy(false);
     }
   };
 
-  const courtesyWhatsAppUrl = (phone: string, name: string, ticketCode: string) => {
+  // Sem número, o wa.me abre o seletor de contato do WhatsApp com a mensagem pronta
+  const courtesyWhatsAppUrl = (phone: string, name: string, ticketCode: string, kind: 'courtesy' | 'volunteer' = 'courtesy', hasEmail = false) => {
     const raw = phone.replace(/\D/g, '');
-    const withDdi = raw.startsWith('55') ? raw : `55${raw}`;
+    const withDdi = raw ? (raw.startsWith('55') ? raw : `55${raw}`) : '';
     const url = new URL(`https://wa.me/${withDdi}`);
+    const delivery = hasEmail
+      ? 'O ingresso em PDF, com o QR Code para a portaria, foi enviado para o seu e-mail. Qualquer dúvida é só chamar.'
+      : 'Vou te mandar aqui o ingresso em PDF com o QR Code para a portaria. Salva no celular!';
     url.searchParams.set(
       'text',
       [
         `Olá, ${name.split(' ')[0]}! 🎭`,
         '',
-        'Você ganhou um *ingresso cortesia* para o *BAILE DA LAGOA (31.10 · SJC)*.',
+        kind === 'volunteer'
+          ? 'Esse é o seu *acesso de voluntário* para o *BAILE DA LAGOA (31.10 · SJC)*. Obrigado por fazer parte da equipe!'
+          : 'Você ganhou um *ingresso cortesia* para o *BAILE DA LAGOA (31.10 · SJC)*.',
         '',
         `Seu código: *${ticketCode}*`,
-        'O ingresso em PDF, com o QR Code para a portaria, foi enviado para o seu e-mail. Qualquer dúvida é só chamar.',
+        delivery,
         '',
         '📍 Av. Gen. Motors, 1159 - Ronda, São José dos Campos · 20h',
         '🎭 Sem máscara, sem entrada.',
@@ -949,7 +972,7 @@ export default function AdminPage() {
             <span className="text-[10px] text-[#5B5B66] uppercase block">PAGOS / INGRESSOS</span>
             <div className="font-persona text-4xl text-emerald-400 mt-1">{metrics.paidCount}</div>
             <span className="text-[9px] text-[#5B5B66] block mt-1">
-              PIX confirmados{metrics.courtesyCount > 0 ? ` · +${metrics.courtesyCount} cortesia(s)` : ''}
+              PIX confirmados{metrics.courtesyCount > 0 ? ` · +${metrics.courtesyCount} cortesia(s)` : ''}{metrics.volunteerCount > 0 ? ` · +${metrics.volunteerCount} voluntário(s)` : ''}
             </span>
           </div>
 
@@ -974,7 +997,7 @@ export default function AdminPage() {
             <span className="text-[10px] text-[#5B5B66] uppercase block">NA FESTA</span>
             <div className="font-persona text-4xl text-sky-400 mt-1">{metrics.checkinCount}</div>
             <span className="text-[9px] text-[#5B5B66] block mt-1">
-              Check-ins de {metrics.paidCount + metrics.courtesyCount} ingressos
+              Check-ins de {metrics.paidCount + metrics.courtesyCount + metrics.volunteerCount} ingressos
             </span>
           </div>
 
@@ -1050,7 +1073,7 @@ export default function AdminPage() {
               className="bg-[#141418] hover:bg-[#1f1f24] text-[#E8E8EF] py-3 md:py-2.5 px-3.5 uppercase text-xs tracking-wider border border-[#1F1F24] hover:border-[#F5C400]/60 flex items-center justify-center gap-1.5 transition-colors"
             >
               <Gift className="w-3.5 h-3.5 text-[#F5C400]" />
-              <span>Cortesia</span>
+              <span>Cortesia / Voluntário</span>
             </button>
           </div>
         </div>
@@ -1096,6 +1119,7 @@ export default function AdminPage() {
               <option value="expired">Expirado (prazo vencido)</option>
               <option value="expiring">Vence em 2h</option>
               <option value="courtesy">Cortesia</option>
+              <option value="volunteer">Voluntário</option>
             </select>
 
             <select
@@ -1127,7 +1151,7 @@ export default function AdminPage() {
               <option value="all">Origem: Todas</option>
               {sources.map((s) => (
                 <option key={s} value={s}>
-                  {s === 'direct' ? 'Direto' : s === 'courtesy' ? 'Cortesia' : s === 'referral' ? 'Indicação' : s.charAt(0).toUpperCase() + s.slice(1)}
+                  {s === 'direct' ? 'Direto' : s === 'courtesy' ? 'Cortesia' : s === 'volunteer' ? 'Voluntário' : s === 'referral' ? 'Indicação' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </option>
               ))}
             </select>
@@ -1163,7 +1187,7 @@ export default function AdminPage() {
             leads.map((lead) => {
               const isNotified = lead.notification_status === 'sent';
               const isPaid = lead.payment_status === 'approved';
-              const waLink = `https://wa.me/55${lead.phone.replace(/\D/g, '')}`;
+              const waLink = lead.phone ? `https://wa.me/55${lead.phone.replace(/\D/g, '')}` : null;
               const deadline = deadlineInfo(lead.payment_deadline);
               const selected = selectedIds.has(lead.id);
 
@@ -1187,6 +1211,9 @@ export default function AdminPage() {
                           {lead.name}
                           {lead.ticket_kind === 'courtesy' && (
                           <span className="ml-1.5 align-middle bg-[#F5C400] text-[#0B0B0D] px-1 py-0.5 text-[8px] font-bold tracking-wider">CORTESIA</span>
+                        )}
+                        {lead.ticket_kind === 'volunteer' && (
+                          <span className="ml-1.5 align-middle bg-[#2DD4BF] text-[#0B0B0D] px-1 py-0.5 text-[8px] font-bold tracking-wider">VOLUNTÁRIO</span>
                         )}
                         {lead.checkin_status && (
                           <span className="ml-1.5 align-middle bg-sky-400 text-[#0B0B0D] px-1 py-0.5 text-[8px] font-bold tracking-wider">
@@ -1249,10 +1276,14 @@ export default function AdminPage() {
                   </div>
 
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[#5B5B66]">
-                    <a href={waLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-emerald-400 font-bold">
-                      <MessageSquare className="w-3 h-3" />
-                      {lead.phone}
-                    </a>
+                    {waLink ? (
+                      <a href={waLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                        <MessageSquare className="w-3 h-3" />
+                        {lead.phone}
+                      </a>
+                    ) : (
+                      <span className="uppercase text-[9px] text-[#5B5B66]">sem telefone</span>
+                    )}
                     <span className="bg-[#0B0B0D] border border-[#1F1F24] px-1.5 py-0.5 uppercase text-[9px]">{lead.source}</span>
                     <span>
                       {new Date(lead.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
@@ -1352,6 +1383,9 @@ export default function AdminPage() {
                             {lead.ticket_kind === 'courtesy' && (
                           <span className="ml-1.5 align-middle bg-[#F5C400] text-[#0B0B0D] px-1 py-0.5 text-[8px] font-bold tracking-wider">CORTESIA</span>
                         )}
+                        {lead.ticket_kind === 'volunteer' && (
+                          <span className="ml-1.5 align-middle bg-[#2DD4BF] text-[#0B0B0D] px-1 py-0.5 text-[8px] font-bold tracking-wider">VOLUNTÁRIO</span>
+                        )}
                         {lead.checkin_status && (
                           <span className="ml-1.5 align-middle bg-sky-400 text-[#0B0B0D] px-1 py-0.5 text-[8px] font-bold tracking-wider">
                             ENTROU {lead.checkin_at ? new Date(lead.checkin_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -1374,16 +1408,20 @@ export default function AdminPage() {
                       </td>
 
                       <td className="p-3">
-                        <a
-                          href={`https://wa.me/55${lead.phone.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold text-xs"
-                          title="Abrir WhatsApp"
-                        >
-                          <MessageSquare className="w-3 h-3" />
-                          <span>{lead.phone}</span>
-                        </a>
+                        {lead.phone ? (
+                          <a
+                            href={`https://wa.me/55${lead.phone.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold text-xs"
+                            title="Abrir WhatsApp"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            <span>{lead.phone}</span>
+                          </a>
+                        ) : (
+                          <span className="text-[9px] uppercase text-[#5B5B66]">sem telefone</span>
+                        )}
                       </td>
 
                       <td className="p-3 text-[10px] text-[#5B5B66]">
@@ -1496,7 +1534,7 @@ export default function AdminPage() {
         if (!lead) return null;
         const isPaid = lead.payment_status === 'approved';
         const deadline = deadlineInfo(lead.payment_deadline);
-        const waLink = `https://wa.me/55${lead.phone.replace(/\D/g, '')}`;
+        const waLink = lead.phone ? `https://wa.me/55${lead.phone.replace(/\D/g, '')}` : null;
         const timeline: Array<{ label: string; at: string | null | undefined; tone?: string }> = [
           { label: 'Cadastro na fila', at: lead.created_at },
           { label: 'Liberado para compra', at: lead.notification_date },
@@ -1514,7 +1552,8 @@ export default function AdminPage() {
                   <h3 className="font-persona text-2xl uppercase leading-tight truncate">{lead.name}</h3>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {lead.ticket_kind === 'courtesy' && <span className="bg-[#F5C400] text-[#0B0B0D] px-1.5 py-0.5 text-[9px] font-bold">CORTESIA</span>}
-                    {isPaid && lead.ticket_kind !== 'courtesy' && <span className="bg-emerald-500 text-[#0B0B0D] px-1.5 py-0.5 text-[9px] font-bold">PAGO</span>}
+                    {lead.ticket_kind === 'volunteer' && <span className="bg-[#2DD4BF] text-[#0B0B0D] px-1.5 py-0.5 text-[9px] font-bold">VOLUNTÁRIO</span>}
+                    {isPaid && lead.ticket_kind !== 'courtesy' && lead.ticket_kind !== 'volunteer' && <span className="bg-emerald-500 text-[#0B0B0D] px-1.5 py-0.5 text-[9px] font-bold">PAGO</span>}
                     {lead.checkin_status && <span className="bg-sky-400 text-[#0B0B0D] px-1.5 py-0.5 text-[9px] font-bold">NA FESTA</span>}
                     {lead.ticket_status === 'cancelled' && <span className="bg-[#FF2E3B] text-white px-1.5 py-0.5 text-[9px] font-bold">INGRESSO CANCELADO</span>}
                     {!isPaid && deadline?.expired && <span className="bg-[#FF2E3B]/20 border border-[#FF2E3B] text-[#FF2E3B] px-1.5 py-0.5 text-[9px] font-bold">PRAZO VENCIDO</span>}
@@ -1532,7 +1571,13 @@ export default function AdminPage() {
                 <section>
                   <h4 className="text-[9px] uppercase tracking-widest text-[#5B5B66] mb-2">Contato</h4>
                   <div className="space-y-1 text-[#E8E8EF]">
-                    <p><a href={waLink} target="_blank" rel="noreferrer" className="text-emerald-400 font-bold inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{lead.phone}</a></p>
+                    <p>
+                      {waLink ? (
+                        <a href={waLink} target="_blank" rel="noreferrer" className="text-emerald-400 font-bold inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{lead.phone}</a>
+                      ) : (
+                        <span className="uppercase text-amber-300">Sem telefone</span>
+                      )}
+                    </p>
                     <p className="lowercase break-all">{lead.email ?? <span className="uppercase text-amber-300">Sem e-mail — entregar PDF pelo WhatsApp</span>}</p>
                     <p className="text-[#8C8C9A]">
                       {[lead.neighborhood, lead.age ? `${lead.age} anos` : null, lead.instagram].filter(Boolean).join(' · ') || 'Sem dados extras'}
@@ -1548,7 +1593,9 @@ export default function AdminPage() {
                     <>
                       <p className="font-mono text-xl text-[#8A3CFF] tracking-widest">{lead.ticket_code}</p>
                       <p className="text-[#8C8C9A] mt-1">
-                        {lead.ticket_kind === 'courtesy'
+                        {lead.ticket_kind === 'volunteer'
+                          ? `Voluntário${lead.courtesy_note ? ` · ${lead.courtesy_note}` : ''}`
+                          : lead.ticket_kind === 'courtesy'
                           ? `Cortesia${lead.courtesy_note ? ` · ${lead.courtesy_note}` : ''}`
                           : lead.paid_order
                           ? `${lead.paid_order.lot_name ?? 'Lote'} · ${formatBRL(lead.paid_order.paid_amount_cents ?? lead.paid_order.amount_cents)} · ${lead.paid_order.provider}${lead.paid_order.capture_method ? ` (${lead.paid_order.capture_method})` : ''}`
@@ -1654,14 +1701,36 @@ export default function AdminPage() {
               <X className="w-5 h-5" />
             </button>
 
-            <span className="text-[9px] uppercase text-[#F5C400] tracking-widest block mb-1">
-              {'// CONVIDADOS'}
+            <span className={`text-[9px] uppercase tracking-widest block mb-1 ${courtesyForm.kind === 'volunteer' ? 'text-[#2DD4BF]' : 'text-[#F5C400]'}`}>
+              {courtesyForm.kind === 'volunteer' ? '// EQUIPE' : '// CONVIDADOS'}
             </span>
-            <h3 className="font-persona text-2xl uppercase tracking-tight mb-2">
-              EMITIR INGRESSO CORTESIA
+            <h3 className="font-persona text-2xl uppercase tracking-tight mb-3">
+              {courtesyForm.kind === 'volunteer' ? 'EMITIR ACESSO DE VOLUNTÁRIO' : 'EMITIR INGRESSO CORTESIA'}
             </h3>
+
+            <div className="grid grid-cols-2 gap-1 mb-3 text-[10px] uppercase tracking-wider font-data">
+              <button
+                type="button"
+                onClick={() => setCourtesyForm((f) => ({ ...f, kind: 'courtesy' }))}
+                className={`py-2 border transition-colors ${courtesyForm.kind === 'courtesy' ? 'bg-[#F5C400] text-[#0B0B0D] border-[#F5C400] font-bold' : 'bg-[#0B0B0D] text-[#5B5B66] border-[#1F1F24]'}`}
+              >
+                🎁 Cortesia
+              </button>
+              <button
+                type="button"
+                onClick={() => setCourtesyForm((f) => ({ ...f, kind: 'volunteer' }))}
+                className={`py-2 border transition-colors ${courtesyForm.kind === 'volunteer' ? 'bg-[#2DD4BF] text-[#0B0B0D] border-[#2DD4BF] font-bold' : 'bg-[#0B0B0D] text-[#5B5B66] border-[#1F1F24]'}`}
+              >
+                🙋 Voluntário
+              </button>
+            </div>
+
             <p className="text-xs text-[#5B5B66] mb-5">
-              Gera um código <strong className="text-[#E8E8EF]">BDL-C-XXXXXX</strong> válido na portaria. Não ocupa vaga de lote e não entra na receita. Com e-mail, o PDF vai automaticamente; sem e-mail, você baixa o PDF e manda pelo WhatsApp.
+              {courtesyForm.kind === 'volunteer' ? (
+                <>Gera um código <strong className="text-[#E8E8EF]">BDL-V-XXXXXX</strong> para a equipe. Só o nome é obrigatório. Conta como ingresso nas métricas, mas não na receita nem na vaga de lote. Você baixa o PDF e manda pelo WhatsApp.</>
+              ) : (
+                <>Gera um código <strong className="text-[#E8E8EF]">BDL-C-XXXXXX</strong> válido na portaria. Não ocupa vaga de lote e não entra na receita. Com e-mail, o PDF vai automaticamente; sem e-mail, você baixa o PDF e manda pelo WhatsApp.</>
+              )}
             </p>
 
             {courtesyResult && (
@@ -1678,7 +1747,7 @@ export default function AdminPage() {
                       <FileDown className="w-3.5 h-3.5" /> Baixar PDF
                     </button>
                     <a
-                      href={courtesyWhatsAppUrl(courtesyResult.phone ?? '', courtesyResult.name ?? '', courtesyResult.ticketCode)}
+                      href={courtesyWhatsAppUrl(courtesyResult.phone ?? '', courtesyResult.name ?? '', courtesyResult.ticketCode, courtesyResult.kind ?? 'courtesy', courtesyResult.hasEmail)}
                       target="_blank"
                       rel="noreferrer"
                       className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 py-2.5 uppercase text-[10px] tracking-wider flex items-center justify-center gap-1.5"
@@ -1703,7 +1772,7 @@ export default function AdminPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">WhatsApp (com DDD) *</label>
+                  <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">WhatsApp (com DDD){courtesyForm.kind === 'courtesy' ? ' *' : ' (opcional)'}</label>
                   <input
                     type="tel"
                     value={courtesyForm.phone}
@@ -1723,7 +1792,7 @@ export default function AdminPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">Observação (ex.: banda, equipe, convidado)</label>
+                <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">{courtesyForm.kind === 'volunteer' ? 'Função (ex.: som, portaria, bar)' : 'Observação (ex.: banda, convidado)'}</label>
                 <input
                   type="text"
                   value={courtesyForm.note}
@@ -1748,14 +1817,14 @@ export default function AdminPage() {
               <button
                 type="submit"
                 disabled={isIssuingCourtesy}
-                className="w-full bg-[#F5C400] hover:bg-[#ffd21a] disabled:opacity-50 text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors"
+                className={`w-full disabled:opacity-50 text-[#0B0B0D] font-persona text-lg py-3 px-4 uppercase tracking-normal flex items-center justify-center gap-2 transition-colors ${courtesyForm.kind === 'volunteer' ? 'bg-[#2DD4BF] hover:bg-[#5eead4]' : 'bg-[#F5C400] hover:bg-[#ffd21a]'}`}
               >
                 {isIssuingCourtesy ? (
                   <span>EMITINDO...</span>
                 ) : (
                   <>
                     <Gift className="w-4 h-4" />
-                    <span>EMITIR CORTESIA</span>
+                    <span>{courtesyForm.kind === 'volunteer' ? 'EMITIR ACESSO' : 'EMITIR CORTESIA'}</span>
                   </>
                 )}
               </button>
@@ -2148,7 +2217,7 @@ export default function AdminPage() {
                         return (
                           l.name.toLowerCase().includes(q) ||
                           (l.email ?? '').toLowerCase().includes(q) ||
-                          l.phone.includes(q)
+                          (l.phone ?? '').includes(q)
                         );
                       })
                       .map((lead) => (
@@ -2178,7 +2247,7 @@ export default function AdminPage() {
                               </span>
                             </div>
                             <div className="text-[10px] text-[#5B5B66] truncate">
-                              {lead.email ?? 'sem e-mail'} · {lead.phone}
+                              {lead.email ?? 'sem e-mail'} · {lead.phone ?? 'sem telefone'}
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -2204,7 +2273,7 @@ export default function AdminPage() {
                     {leads.filter((l) => {
                       if (!fallbackSearch) return true;
                       const q = fallbackSearch.toLowerCase();
-                      return l.name.toLowerCase().includes(q) || (l.email ?? '').toLowerCase().includes(q) || l.phone.includes(q);
+                      return l.name.toLowerCase().includes(q) || (l.email ?? '').toLowerCase().includes(q) || (l.phone ?? '').includes(q);
                     }).length === 0 && (
                       <div className="p-4 text-center text-[#5B5B66] text-[11px] uppercase">
                         Nenhum registro encontrado
