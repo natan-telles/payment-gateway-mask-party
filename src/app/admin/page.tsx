@@ -351,6 +351,10 @@ export default function AdminPage() {
   };
 
   const handleResendTicket = async (lead: AdminLead) => {
+    if (!lead.email) {
+      setDetailFeedback('Este cadastro não tem e-mail. Baixe o PDF e envie pelo WhatsApp.');
+      return;
+    }
     setResendingTicket(true);
     setDetailFeedback(null);
     try {
@@ -413,7 +417,7 @@ export default function AdminPage() {
       l.queue_position,
       `"${l.name}"`,
       `"${l.phone}"`,
-      `"${l.email}"`,
+      `"${l.email ?? ''}"`,
       l.age || '',
       `"${l.neighborhood || ''}"`,
       `"${l.instagram || ''}"`,
@@ -565,8 +569,12 @@ export default function AdminPage() {
   const handleIssueCourtesy = async (e: React.FormEvent) => {
     e.preventDefault();
     const { name, phone, email, note, sendEmail } = courtesyForm;
-    if (!name.trim() || phone.replace(/\D/g, '').length < 10 || !email.includes('@')) {
-      setCourtesyResult({ type: 'error', message: 'Preencha nome, WhatsApp com DDD e um e-mail válido.' });
+    if (!name.trim() || phone.replace(/\D/g, '').length < 10) {
+      setCourtesyResult({ type: 'error', message: 'Preencha nome e WhatsApp com DDD.' });
+      return;
+    }
+    if (email.trim() && !email.includes('@')) {
+      setCourtesyResult({ type: 'error', message: 'E-mail inválido. Deixe em branco para emitir sem e-mail.' });
       return;
     }
 
@@ -586,8 +594,9 @@ export default function AdminPage() {
         if (data.alreadyPaid) message = data.message;
         else if (data.alreadyIssued) message = `${t.name} já tinha cortesia emitida (${t.ticket_code}). Nenhum código novo foi gerado.`;
         else message = `Cortesia ${t.ticket_code} emitida para ${t.name}${data.reusedLead ? ' (cadastro já existente na fila)' : ''}.`;
-        if (sendEmail && !data.alreadyPaid) {
-          message += data.emailSent ? ' E-mail com QR Code e PDF enviado.' : ` E-mail FALHOU${data.emailError ? `: ${data.emailError}` : ''} — baixe o PDF e envie manualmente.`;
+        if (!data.alreadyPaid) {
+          if (!data.hasEmail) message += ' Sem e-mail: baixe o PDF abaixo e envie pelo WhatsApp.';
+          else if (sendEmail) message += data.emailSent ? ' E-mail com QR Code e PDF enviado.' : ` E-mail FALHOU${data.emailError ? `: ${data.emailError}` : ''} — baixe o PDF e envie manualmente.`;
         }
         setCourtesyResult({ type: 'success', message, ticketCode: t.ticket_code, leadId: t.id, name: t.name, phone: t.phone });
         fetchLeads();
@@ -1197,7 +1206,7 @@ export default function AdminPage() {
                           <ChevronRight className="inline w-3.5 h-3.5 ml-1 align-middle text-[#5B5B66]" />
                         </strong>
                       </button>
-                      <span className="block text-[10px] text-[#5B5B66] lowercase truncate">{lead.email}</span>
+                      <span className="block text-[10px] text-[#5B5B66] lowercase truncate">{lead.email ?? <span className="uppercase text-amber-300">sem e-mail · pdf/whatsapp</span>}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -1360,7 +1369,7 @@ export default function AdminPage() {
                         {lead.notes && <StickyNote className="inline w-3 h-3 ml-1.5 align-middle text-amber-300" aria-label="Tem observação" />}
                           </strong>
                         </button>
-                        <span className="block text-[10px] text-[#5B5B66] lowercase">{lead.email}</span>
+                        <span className="block text-[10px] text-[#5B5B66] lowercase">{lead.email ?? <span className="uppercase text-amber-300">sem e-mail · pdf/whatsapp</span>}</span>
                         {lead.ticket_code && <span className="block text-[9px] font-mono text-[#8A3CFF]">{lead.ticket_code}</span>}
                       </td>
 
@@ -1524,7 +1533,7 @@ export default function AdminPage() {
                   <h4 className="text-[9px] uppercase tracking-widest text-[#5B5B66] mb-2">Contato</h4>
                   <div className="space-y-1 text-[#E8E8EF]">
                     <p><a href={waLink} target="_blank" rel="noreferrer" className="text-emerald-400 font-bold inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{lead.phone}</a></p>
-                    <p className="lowercase break-all">{lead.email}</p>
+                    <p className="lowercase break-all">{lead.email ?? <span className="uppercase text-amber-300">Sem e-mail — entregar PDF pelo WhatsApp</span>}</p>
                     <p className="text-[#8C8C9A]">
                       {[lead.neighborhood, lead.age ? `${lead.age} anos` : null, lead.instagram].filter(Boolean).join(' · ') || 'Sem dados extras'}
                     </p>
@@ -1555,7 +1564,7 @@ export default function AdminPage() {
                             <FileDown className="w-3.5 h-3.5" /> PDF
                           </button>
                         )}
-                        {isPaid && lead.ticket_status !== 'cancelled' && (
+                        {isPaid && lead.ticket_status !== 'cancelled' && lead.email && (
                           <button onClick={() => handleResendTicket(lead)} disabled={resendingTicket} className="bg-[#0B0B0D] border border-[#1F1F24] text-[#E8E8EF] py-2 uppercase text-[10px] tracking-wider flex items-center justify-center gap-1.5 disabled:opacity-50">
                             <Mail className="w-3.5 h-3.5 text-[#8A3CFF]" /> {resendingTicket ? 'Enviando...' : 'Reenviar e-mail'}
                           </button>
@@ -1652,7 +1661,7 @@ export default function AdminPage() {
               EMITIR INGRESSO CORTESIA
             </h3>
             <p className="text-xs text-[#5B5B66] mb-5">
-              Gera um código <strong className="text-[#E8E8EF]">BDL-C-XXXXXX</strong> válido na portaria. Não ocupa vaga de lote e não entra na receita. O ingresso em PDF vai por e-mail.
+              Gera um código <strong className="text-[#E8E8EF]">BDL-C-XXXXXX</strong> válido na portaria. Não ocupa vaga de lote e não entra na receita. Com e-mail, o PDF vai automaticamente; sem e-mail, você baixa o PDF e manda pelo WhatsApp.
             </p>
 
             {courtesyResult && (
@@ -1704,7 +1713,7 @@ export default function AdminPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">E-mail * (recebe o PDF)</label>
+                  <label className="block text-[10px] uppercase text-[#5B5B66] mb-1">E-mail (opcional · recebe o PDF)</label>
                   <input
                     type="email"
                     value={courtesyForm.email}
@@ -1726,11 +1735,14 @@ export default function AdminPage() {
               <label className="flex items-start gap-2 text-[10px] text-[#8C8C9A] cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={courtesyForm.sendEmail}
+                  checked={courtesyForm.sendEmail && Boolean(courtesyForm.email.trim())}
+                  disabled={!courtesyForm.email.trim()}
                   onChange={(e) => setCourtesyForm((f) => ({ ...f, sendEmail: e.target.checked }))}
-                  className="mt-0.5 accent-[#F5C400]"
+                  className="mt-0.5 accent-[#F5C400] disabled:opacity-40"
                 />
-                <span>Enviar agora o e-mail com QR Code e PDF (gasta 1 e-mail da cota do Resend)</span>
+                <span className={courtesyForm.email.trim() ? '' : 'opacity-50'}>
+                  Enviar agora o e-mail com QR Code e PDF (gasta 1 e-mail da cota do Resend){courtesyForm.email.trim() ? '' : ' — informe um e-mail para habilitar'}
+                </span>
               </label>
 
               <button
@@ -2135,7 +2147,7 @@ export default function AdminPage() {
                         const q = fallbackSearch.toLowerCase();
                         return (
                           l.name.toLowerCase().includes(q) ||
-                          l.email.toLowerCase().includes(q) ||
+                          (l.email ?? '').toLowerCase().includes(q) ||
                           l.phone.includes(q)
                         );
                       })
@@ -2166,7 +2178,7 @@ export default function AdminPage() {
                               </span>
                             </div>
                             <div className="text-[10px] text-[#5B5B66] truncate">
-                              {lead.email} · {lead.phone}
+                              {lead.email ?? 'sem e-mail'} · {lead.phone}
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -2192,7 +2204,7 @@ export default function AdminPage() {
                     {leads.filter((l) => {
                       if (!fallbackSearch) return true;
                       const q = fallbackSearch.toLowerCase();
-                      return l.name.toLowerCase().includes(q) || l.email.toLowerCase().includes(q) || l.phone.includes(q);
+                      return l.name.toLowerCase().includes(q) || (l.email ?? '').toLowerCase().includes(q) || l.phone.includes(q);
                     }).length === 0 && (
                       <div className="p-4 text-center text-[#5B5B66] text-[11px] uppercase">
                         Nenhum registro encontrado
