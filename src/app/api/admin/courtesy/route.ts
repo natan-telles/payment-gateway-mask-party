@@ -18,7 +18,7 @@ interface IssueResult {
   reused_lead?: boolean;
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string;
   queue_position: number;
   ticket_code: string;
@@ -76,18 +76,22 @@ export async function POST(req: NextRequest) {
     const cleanPhone = (phone ?? '').replace(/\D/g, '');
     const cleanEmail = (email ?? '').trim().toLowerCase();
 
-    if (!cleanName || cleanPhone.length < 10 || !cleanEmail.includes('@')) {
+    // E-mail é opcional: sem ele, o admin baixa o PDF e manda pelo WhatsApp
+    if (!cleanName || cleanPhone.length < 10) {
       return NextResponse.json(
-        { success: false, error: 'Nome, WhatsApp (com DDD) e e-mail válido são obrigatórios para a cortesia.' },
+        { success: false, error: 'Nome e WhatsApp (com DDD) são obrigatórios para a cortesia.' },
         { status: 400 }
       );
+    }
+    if (cleanEmail && !cleanEmail.includes('@')) {
+      return NextResponse.json({ success: false, error: 'E-mail inválido. Deixe em branco para emitir sem e-mail.' }, { status: 400 });
     }
 
     const supabase = createAdminClient();
     const { data, error } = await supabase.rpc('issue_courtesy_ticket', {
       p_name: cleanName,
       p_phone: cleanPhone,
-      p_email: cleanEmail,
+      p_email: cleanEmail || null,
       p_note: note?.trim() || null,
     });
 
@@ -115,15 +119,16 @@ export async function POST(req: NextRequest) {
 
     let emailSent = false;
     let emailError: string | undefined;
+    const canEmail = Boolean(result.email);
 
-    if (sendEmail) {
+    if (sendEmail && canEmail) {
       const pdf = await buildTicketPdfAttachment(
         { name: result.name, email: result.email, ticketCode: result.ticket_code, kind: 'courtesy', note: note?.trim() || null },
         result.id
       );
 
       const emailRes = await sendTicketEmail({
-        to: result.email,
+        to: result.email as string,
         name: result.name,
         ticketCode: result.ticket_code,
         lotName: 'CORTESIA',
@@ -140,7 +145,7 @@ export async function POST(req: NextRequest) {
       kind: 'ticket',
       message: `Cortesia ${result.already_issued ? 'reaproveitada' : 'emitida'}: ${result.ticket_code} para ${result.name} (${result.email})` +
         (note?.trim() ? ` · ${note.trim()}` : '') +
-        (sendEmail ? (emailSent ? ' · e-mail enviado' : ' · e-mail FALHOU') : ' · sem e-mail') + '.',
+        (!canEmail ? ' · sem e-mail (entrega por PDF/WhatsApp)' : sendEmail ? (emailSent ? ' · e-mail enviado' : ' · e-mail FALHOU') : ' · e-mail não enviado') + '.',
       leadId: result.id,
       email: result.email,
       meta: { ticketCode: result.ticket_code, reusedLead: result.reused_lead, alreadyIssued: result.already_issued, sendEmail, emailSent },
@@ -152,6 +157,7 @@ export async function POST(req: NextRequest) {
       reusedLead: Boolean(result.reused_lead),
       emailSent,
       emailError,
+      hasEmail: canEmail,
       ticket: result,
     });
   } catch (err) {

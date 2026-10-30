@@ -152,6 +152,11 @@ BEGIN
     v_clean_phone := regexp_replace(p_phone, '[^\d]', '', 'g');
     v_clean_email := lower(trim(p_email));
 
+    -- Fila de compra exige e-mail (só a cortesia pode ficar sem)
+    IF v_clean_email IS NULL OR v_clean_email = '' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'email_required');
+    END IF;
+
     -- Verificar se já existe cadastro por telefone ou e-mail
     SELECT id, queue_position, name, phone, email, created_at
     INTO v_existing
@@ -515,7 +520,17 @@ ALTER TABLE public.notification_logs ENABLE ROW LEVEL SECURITY;
 -- payment_status = 'approved' e ticket_kind = 'courtesy', código no padrão
 -- BDL-C-XXXXXX. Não cria payment_orders, então NÃO ocupa vaga de lote.
 -- A portaria valida igual a um ingresso pago.
+--
+-- E-mail é OPCIONAL na cortesia (o admin baixa o PDF e envia pelo WhatsApp).
+-- Para isso o e-mail deixa de ser NOT NULL e a unicidade passa a valer só
+-- quando há e-mail (índice parcial). A fila de compra continua exigindo e-mail
+-- (register_queue_lead valida), então nada muda para quem compra.
 -- ============================================================
+ALTER TABLE public.waiting_queue ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE public.waiting_queue DROP CONSTRAINT IF EXISTS uq_waiting_queue_email;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_waiting_queue_email_not_null
+    ON public.waiting_queue (email) WHERE email IS NOT NULL;
+
 CREATE OR REPLACE FUNCTION public.issue_courtesy_ticket(
     p_name TEXT,
     p_phone TEXT,
@@ -531,17 +546,18 @@ DECLARE
     v_lead RECORD;
     v_code TEXT;
     v_phone TEXT := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
-    v_email TEXT := lower(trim(coalesce(p_email, '')));
+    -- e-mail opcional: vazio vira NULL
+    v_email TEXT := nullif(lower(trim(coalesce(p_email, ''))), '');
 BEGIN
-    IF trim(coalesce(p_name, '')) = '' OR v_phone = '' OR v_email = '' THEN
+    IF trim(coalesce(p_name, '')) = '' OR v_phone = '' THEN
         RETURN jsonb_build_object('success', false, 'error', 'missing_fields');
     END IF;
 
-    -- Reaproveita cadastro existente (mesmo telefone ou e-mail)
+    -- Reaproveita cadastro existente (mesmo telefone ou, se informado, mesmo e-mail)
     SELECT id, name, email, phone, queue_position, ticket_code, ticket_kind, payment_status
     INTO v_lead
     FROM public.waiting_queue
-    WHERE phone = v_phone OR email = v_email
+    WHERE phone = v_phone OR (v_email IS NOT NULL AND email = v_email)
     LIMIT 1
     FOR UPDATE;
 
@@ -570,6 +586,7 @@ BEGIN
             ticket_code = v_code,
             ticket_kind = 'courtesy',
             courtesy_note = nullif(trim(coalesce(p_note, '')), ''),
+            email = coalesce(email, v_email),
             notification_status = 'sent',
             notification_date = coalesce(notification_date, now())
         WHERE id = v_lead.id;
@@ -580,7 +597,7 @@ BEGIN
             'reused_lead', true,
             'id', v_lead.id,
             'name', v_lead.name,
-            'email', v_lead.email,
+            'email', coalesce(v_lead.email, v_email),
             'phone', v_lead.phone,
             'queue_position', v_lead.queue_position,
             'ticket_code', v_code,
