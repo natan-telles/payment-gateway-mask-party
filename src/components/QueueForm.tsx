@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { MIN_AGE, MAX_AGE } from '@/lib/event';
 import { QueueResponse } from '@/types/database';
 
 interface QueueFormProps {
@@ -175,8 +176,8 @@ export function QueueForm({ onSuccess }: QueueFormProps) {
                 <label className="block text-[9px] uppercase text-[#5B5B66] mb-1">Idade</label>
                 <input
                   type="number"
-                  min="16"
-                  max="99"
+                  min={MIN_AGE}
+                  max={MAX_AGE}
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
                   placeholder="20"

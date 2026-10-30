@@ -7,6 +7,7 @@ import { DEFAULT_LOT } from '@/lib/lots/labels';
 // O e-mail de confirmação cita o lote vigente; se o banco falhar, segue com o padrão
 const currentLotName = () => getCurrentLotLabels().then((lot) => lot.name, () => DEFAULT_LOT.name);
 import { JoinQueueInput, PaymentStatus, QueueResponse } from '@/types/database';
+import { MIN_AGE, MAX_AGE } from '@/lib/event';
 
 // Cache / fallback em memória para testes locais quando o Supabase ainda não estiver configurado no .env
 let mockCounter = 42;
@@ -22,6 +23,17 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Nome, Telefone e E-mail são obrigatórios.' },
         { status: 400 }
       );
+    }
+
+    // Idade é opcional, mas, quando informada, precisa estar na faixa do evento
+    if (age !== undefined && age !== null && String(age).trim() !== '') {
+      const parsedAge = Number(age);
+      if (!Number.isInteger(parsedAge) || parsedAge < MIN_AGE || parsedAge > MAX_AGE) {
+        return NextResponse.json<QueueResponse>(
+          { success: false, error: `A festa é para quem tem ${MIN_AGE} anos ou mais.` },
+          { status: 400 }
+        );
+      }
     }
 
     const cleanPhone = phone.replace(/\D/g, '');
